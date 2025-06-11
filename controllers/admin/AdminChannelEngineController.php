@@ -20,8 +20,23 @@ class AdminChannelEngineController extends ModuleAdminController
 
     private function renderLoginForm(): string
     {
-        return '
-        <div> Hello world! </div>
-        ';
+        $this->addCSS($this->module->getPathUri() . 'views/css/admin.css');
+        $this->addJS($this->module->getPathUri() . 'views/js/admin.js');
+
+        return $this->renderTemplate('welcome.tpl');
+    }
+
+    private function renderTemplate(string $template): string
+    {
+        $templatePath = $this->module->getLocalPath() . '/views/templates/admin/' . $template;
+
+        if (file_exists($templatePath)) {
+            ob_start();
+            include $templatePath;
+
+            return ob_get_clean();
+        }
+
+        return false;
     }
 }

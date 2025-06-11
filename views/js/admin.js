@@ -1,132 +1,109 @@
-/**
- * ChannelEngine Admin JavaScript
- */
 var ChannelEngine = {
 
-    /**
-     * Initialize the ChannelEngine admin interface
-     */
+    ajax: null,
+    modal: null,
+
     init: function() {
-        console.log('ChannelEngine admin interface initialized');
+        this.ajax = new ChannelEngineAjax();
+        this.createModal();
         this.bindEvents();
     },
 
-    /**
-     * Bind event listeners
-     */
     bindEvents: function() {
-        // Add any additional event listeners here
-        document.addEventListener('DOMContentLoaded', function() {
-            ChannelEngine.onDOMReady();
+        var self = this;
+
+        document.addEventListener('click', function(event) {
+            if (event.target === self.modal) {
+                self.closeModal();
+            }
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && self.modal && self.modal.classList.contains('show')) {
+                self.closeModal();
+            }
         });
     },
 
     /**
-     * Handle DOM ready event
+     * Initialize modal (it's already in the DOM)
      */
-    onDOMReady: function() {
-        // Any initialization that needs to happen after DOM is loaded
-        console.log('ChannelEngine DOM ready');
+    createModal: function() {
+        this.modal = document.getElementById('channelengine-modal');
+
+        if (!this.modal) {
+            console.error('Modal not found in DOM');
+            // Fallback: create a simple modal
+            this.createFallbackModal();
+        }
     },
 
     /**
      * Handle connect button click
      */
     handleConnect: function() {
-        console.log('Connect button clicked');
+        this.openModal();
+    },
 
-        // Show loading state
-        var connectBtn = document.querySelector('.channelengine-connect-btn');
-        if (connectBtn) {
-            var originalText = connectBtn.textContent;
-            connectBtn.textContent = 'Connecting...';
-            connectBtn.disabled = true;
-
-            // Simulate connection process (replace with actual logic)
-            setTimeout(function() {
-                connectBtn.textContent = originalText;
-                connectBtn.disabled = false;
-
-                // Add your actual connection logic here
-                ChannelEngine.initiateConnection();
-            }, 1000);
+    /**
+     * Open modal
+     */
+    openModal: function() {
+        if (this.modal) {
+            this.modal.classList.add('show');
         }
     },
 
     /**
-     * Initiate connection to ChannelEngine
+     * Close modal
      */
-    initiateConnection: function() {
-        // Replace this with your actual connection logic
-        console.log('Initiating ChannelEngine connection...');
-
-        // Example: Redirect to configuration page
-        // window.location.href = '/admin/modules/configure/channelengine';
-
-        // Example: Open connection modal
-        // this.openConnectionModal();
-
-        // Example: Make AJAX call to start connection process
-        // this.makeConnectionRequest();
+    closeModal: function() {
+        if (this.modal) {
+            this.modal.classList.remove('show');
+            document.getElementById('account_name').value = '';
+            document.getElementById('api_key').value = '';
+        }
     },
 
     /**
-     * Make AJAX request for connection
+     * Handle login
      */
-    makeConnectionRequest: function() {
-        // Example AJAX implementation
-        /*
-        fetch('/admin/ajax/channelengine/connect', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({
-                action: 'connect'
+    handleLogin: function() {
+        var accountName = document.getElementById('account_name').value;
+        var apiKey = document.getElementById('api_key').value;
+        var connectBtn = this.modal.querySelector('.channelengine-btn-primary');
+
+        if (!accountName || !apiKey) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        // Show loading
+        connectBtn.textContent = 'Connecting...';
+        connectBtn.disabled = true;
+
+        // Make request
+        this.ajax.post('/connect', {
+            account_name: accountName,
+            api_key: apiKey
+        })
+            .then(response => {
+                if (response.success) {
+                    alert('Connected successfully!');
+                    this.closeModal();
+                } else {
+                    alert('Connection failed: ' + (response.message || 'Unknown error'));
+                }
             })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                this.showSuccessMessage('Successfully connected to ChannelEngine!');
-            } else {
-                this.showErrorMessage('Connection failed: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Connection error:', error);
-            this.showErrorMessage('Connection failed. Please try again.');
-        });
-        */
-    },
-
-    /**
-     * Show success message
-     */
-    showSuccessMessage: function(message) {
-        // Implement success notification
-        console.log('Success: ' + message);
-        // You can integrate with PrestaShop's notification system here
-    },
-
-    /**
-     * Show error message
-     */
-    showErrorMessage: function(message) {
-        // Implement error notification
-        console.error('Error: ' + message);
-        // You can integrate with PrestaShop's notification system here
-    },
-
-    /**
-     * Open connection modal (if you prefer modal over redirect)
-     */
-    openConnectionModal: function() {
-        // Implement modal logic here
-        console.log('Opening connection modal...');
+            .catch(error => {
+                alert('Connection failed: ' + error.message);
+            })
+            .finally(() => {
+                connectBtn.textContent = 'Connect';
+                connectBtn.disabled = false;
+            });
     }
 };
 
-// Initialize when script loads
+// Initialize
 ChannelEngine.init();

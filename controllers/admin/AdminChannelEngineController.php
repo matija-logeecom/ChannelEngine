@@ -12,31 +12,70 @@ class AdminChannelEngineController extends ModuleAdminController
         $this->meta_title = $this->trans('Channel Engine');
     }
 
-    public function renderView(): string
+    public function renderView()
     {
-        $this->content = $this->renderLoginForm();
+        $this->content = $this->renderWelcomePage();
         return parent::renderView();
     }
 
-    private function renderLoginForm(): string
+    private function renderWelcomePage()
     {
-        $this->addCSS($this->module->getPathUri() . 'views/css/admin.css');
-        $this->addJS($this->module->getPathUri() . 'views/js/admin.js');
+        // Add CSS and JS files to the page
+        $this->context->controller->addCSS($this->module->getPathUri() . 'views/css/admin.css');
+        $this->context->controller->addJS($this->module->getPathUri() . 'views/js/ChannelEngineAjax.js');
+        $this->context->controller->addJS($this->module->getPathUri() . 'views/js/admin.js');
 
-        return $this->renderTemplate('welcome.tpl');
+        // Get the template path
+        $template_path = $this->module->getLocalPath() . 'views/templates/admin/welcome.tpl';
+
+        // Assign template variables
+        $this->context->smarty->assign(array(
+            'module_dir' => $this->module->getPathUri(),
+            'module_name' => $this->module->name,
+            'module_version' => $this->module->version,
+        ));
+
+        // Render the template
+        return $this->context->smarty->fetch($template_path);
     }
 
-    private function renderTemplate(string $template): string
+    /**
+     * Handle AJAX requests
+     */
+    public function ajaxProcess()
     {
-        $templatePath = $this->module->getLocalPath() . '/views/templates/admin/' . $template;
+        // Get JSON input for requests
+        $input = json_decode(file_get_contents('php://input'), true);
 
-        if (file_exists($templatePath)) {
-            ob_start();
-            include $templatePath;
-
-            return ob_get_clean();
+        if (!$input) {
+            $this->ajaxDie(json_encode(array(
+                'success' => false,
+                'message' => 'Invalid request data'
+            )));
         }
 
-        return false;
+        // Simple connection handler
+        if (isset($input['account_name']) && isset($input['api_key'])) {
+            $this->handleConnect($input['account_name'], $input['api_key']);
+        } else {
+            $this->ajaxDie(json_encode(array(
+                'success' => false,
+                'message' => 'Account name and API key required'
+            )));
+        }
+    }
+
+    /**
+     * Handle connection
+     */
+    private function handleConnect($account_name, $api_key)
+    {
+        // TODO: Add actual ChannelEngine API validation here
+
+        // For now, just simulate success
+        $this->ajaxDie(json_encode(array(
+            'success' => true,
+            'message' => 'Connected successfully to ChannelEngine!'
+        )));
     }
 }

@@ -1,0 +1,22 @@
+{
+    "name": "matija/channelengine",
+    "description": "Channel Engine integration module for PrestaShop",
+    "type": "prestashop-module",
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "prestashop/php-dev-tools": "^5.0"
+    },
+    "autoload": {
+        "classmap": [
+            "classes/"
+        ]
+    },
+    "authors": [
+        {
+            "name": "Matija Stankovic",
+            "email": "matija.stankovic@logeecom.com"
+        }
+    ]
+}

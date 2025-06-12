@@ -1,7 +1,6 @@
 <div class="channelengine-container">
     <div class="channelengine-header">
         <div class="channelengine-logo"></div>
-        <h1 class="channelengine-title">channelengine</h1>
     </div>
 
     <div class="channelengine-sync-section">

@@ -18,22 +18,10 @@
 }
 
 .channelengine-logo {
-    width: 50px;
-    height: 50px;
-    background-color: #4A90E2;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 15px;
-    position: relative;
-}
-
-.channelengine-logo::before {
-    content: "▲";
-    color: white;
-    font-size: 24px;
-    font-weight: bold;
+    background-image: url('../img/channelEngineBanner.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
 }
 
 .channelengine-title {
@@ -93,7 +81,7 @@
     border: none;
     padding: 15px 40px;
     border-radius: 6px;
-    font-size: 16px;
+    font-size: 20px;
     font-weight: 500;
     cursor: pointer;
     transition: background-color 0.2s;

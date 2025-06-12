@@ -9,9 +9,9 @@
         "prestashop/php-dev-tools": "^5.0"
     },
     "autoload": {
-        "classmap": [
-            "classes/"
-        ]
+        "psr-4": {
+            "ChannelEngine\\": "classes/"
+        }
     },
     "authors": [
         {

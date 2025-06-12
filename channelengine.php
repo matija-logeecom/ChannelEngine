@@ -1,6 +1,18 @@
 <?php
+
+use ChannelEngine\Infrastructure\Bootstrap;
+use ChannelEngine\Infrastructure\Response\HtmlResponse;
+
 if (!defined('_PS_VERSION_')) {
     exit;
+}
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+try {
+    Bootstrap::init();
+} catch (Throwable $e) {
+    HtmlResponse::createInternalServerError()->view();
 }
 
 class ChannelEngine extends Module

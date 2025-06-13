@@ -1,6 +1,6 @@
 <?php
 
-namespace ChannelEngine\Service\Interface;
+namespace ChannelEngine\Business\Interface;
 
 interface ConfigurationRepositoryInterface
 {

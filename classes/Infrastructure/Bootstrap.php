@@ -2,11 +2,14 @@
 
 namespace ChannelEngine\Infrastructure;
 
+use ChannelEngine\Business\Interface\ChannelEngineProxyInterface;
+use ChannelEngine\Business\Interface\ConfigurationRepositoryInterface;
+use ChannelEngine\Business\Proxy\ChannelEngineProxy;
+use ChannelEngine\Business\Service\AuthorizationService;
 use ChannelEngine\Data\Repository\ConfigurationRepository;
-use ChannelEngine\Service\Interface\ConfigurationRepositoryInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
+use ChannelEngine\Infrastructure\HTTP\HttpClient;
 use ChannelEngine\Infrastructure\Response\HtmlResponse;
-use ChannelEngine\Service\AuthorizationService;
 use Exception;
 
 /*
@@ -23,7 +26,15 @@ class Bootstrap
     public static function init(): void
     {
         try {
+            if (!defined('VIEWS_PATH')) {
+                define('VIEWS_PATH', __DIR__ . '/views');
+            }
+
+            ServiceRegistry::set(HttpClient::class, new HttpClient());
+
             ServiceRegistry::set(ConfigurationRepositoryInterface::class, new ConfigurationRepository());
+
+            ServiceRegistry::set(ChannelEngineProxyInterface::class, new ChannelEngineProxy());
 
             ServiceRegistry::set(AuthorizationService::class, new AuthorizationService());
         } catch (\Throwable $e) {

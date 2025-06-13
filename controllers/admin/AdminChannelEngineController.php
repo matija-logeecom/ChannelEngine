@@ -1,9 +1,9 @@
 <?php
 
+use ChannelEngine\Business\Service\AuthorizationService;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use ChannelEngine\Infrastructure\Request\Request;
 use ChannelEngine\Infrastructure\Response\JsonResponse;
-use ChannelEngine\Service\AuthorizationService;
 
 class AdminChannelEngineController extends ModuleAdminController
 {

@@ -2,7 +2,7 @@
 
 namespace ChannelEngine\Data\Repository;
 
-use ChannelEngine\Service\Interface\ConfigurationRepositoryInterface;
+use ChannelEngine\Business\Interface\ConfigurationRepositoryInterface;
 use Configuration;
 
 class ConfigurationRepository implements ConfigurationRepositoryInterface
@@ -72,6 +72,7 @@ class ConfigurationRepository implements ConfigurationRepositoryInterface
     public function getLastValidatedTimestamp(): ?int
     {
         $timestamp = Configuration::get(self::LAST_VALIDATED_KEY);
+
         return $timestamp ? (int)$timestamp : null;
     }
 

@@ -2,9 +2,9 @@
 
 namespace ChannelEngine\Business\Service;
 
-use ChannelEngine\Business\Interface\AuthorizationServiceInterface;
-use ChannelEngine\Business\Interface\ChannelEngineProxyInterface;
-use ChannelEngine\Business\Interface\ConfigurationRepositoryInterface;
+use ChannelEngine\Business\Interface\Proxy\ChannelEngineProxyInterface;
+use ChannelEngine\Business\Interface\Repository\ConfigurationRepositoryInterface;
+use ChannelEngine\Business\Interface\Service\AuthorizationServiceInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use Exception;
 use RuntimeException;

@@ -2,7 +2,7 @@
 
 namespace ChannelEngine\Data\Repository;
 
-use ChannelEngine\Business\Interface\ConfigurationRepositoryInterface;
+use ChannelEngine\Business\Interface\Repository\ConfigurationRepositoryInterface;
 use Configuration;
 
 class ConfigurationRepository implements ConfigurationRepositoryInterface

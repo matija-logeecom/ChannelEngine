@@ -5,16 +5,15 @@
 
     <div class="channelengine-sync-section">
         <div class="sync-status-container">
-            <div class="sync-status-label">Sync Status:</div>
-            <div class="sync-status-options">
-                <span class="status-done">Done</span>
-                <span class="status-separator">|</span>
-                <span class="status-progress">In progress</span>
-                <span class="status-separator">|</span>
-                <span class="status-error">Error</span>
+            <div class="sync-status-row">
+                <span class="sync-status-label">Sync Status:</span>
+                <span id="sync-status-value" class="status-done">Done</span>
             </div>
         </div>
 
         <button class="sync-button" onclick="ChannelEngine.handleSync()">Synchronize</button>
+
+        <div class="sync-progress" style="display: none;"></div>
+        <div class="sync-error-message" style="display: none;"></div>
     </div>
 </div>

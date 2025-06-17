@@ -50,7 +50,6 @@ class Product
      */
     public static function fromPrestashopProduct(array $prestashopProduct): self
     {
-        // Always use the product ID for the merchant product number.
         $merchantProductNo = (string)($prestashopProduct['id_product'] ?? '');
 
         return new self(

@@ -1,6 +1,6 @@
 <?php
 
-namespace ChannelEngine\Business\Interface;
+namespace ChannelEngine\Business\Interface\Repository;
 
 interface ProductRepositoryInterface
 {

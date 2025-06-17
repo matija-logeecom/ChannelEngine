@@ -1,6 +1,6 @@
 <?php
 
-namespace ChannelEngine\Business\Interface;
+namespace ChannelEngine\Business\Interface\Proxy;
 
 use Exception;
 
@@ -17,4 +17,15 @@ interface ChannelEngineProxyInterface
      * @throws Exception
      */
     public function getSettings(string $accountName, string $apiKey): array;
+
+    /**
+     * Syncs products with Channel Engine
+     *
+     * @param string $accountName
+     * @param string $apiKey
+     * @param array $products
+     *
+     * @return array
+     */
+    public function syncProducts(string $accountName, string $apiKey, array $products): array;
 }

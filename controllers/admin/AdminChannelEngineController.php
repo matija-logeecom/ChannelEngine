@@ -1,7 +1,7 @@
 <?php
 
-use ChannelEngine\Business\Interface\AuthorizationServiceInterface;
-use ChannelEngine\Business\Interface\ProductSyncServiceInterface;
+use ChannelEngine\Business\Interface\Service\AuthorizationServiceInterface;
+use ChannelEngine\Business\Interface\Service\ProductSyncServiceInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use ChannelEngine\Infrastructure\Request\Request;
 use ChannelEngine\Infrastructure\Response\JsonResponse;
@@ -70,14 +70,13 @@ class AdminChannelEngineController extends ModuleAdminController
             $request = new Request();
             $requestData = $request->getBody();
 
-            $action = $requestData['action'] ?? 'connect';
+            $action = $requestData['action'] ?? 'status';
 
             $response = match($action) {
                 'connect' => $this->handleConnect($requestData),
                 'disconnect' => $this->handleDisconnect(),
                 'status' => $this->handleGetStatus(),
                 'sync' => $this->handleSync(),
-                'sync_status' => $this->handleGetSyncStatus(),
                 default => $this->createErrorResponse('Invalid action', 400)
             };
 
@@ -140,17 +139,14 @@ class AdminChannelEngineController extends ModuleAdminController
 
         try {
             $connectionInfo = $this->authService->getConnectionStatus();
-            $syncStatus = $this->productSyncService->getSyncStatus();
         } catch (Exception $e) {
             $connectionInfo = ['data' => []];
-            $syncStatus = ['status' => 'error'];
         }
 
         $this->context->smarty->assign(array(
             'module_dir' => $this->module->getPathUri(),
             'module_name' => $this->module->name,
-            'connection_info' => $connectionInfo['data'],
-            'sync_status' => $syncStatus
+            'connection_info' => $connectionInfo['data']
         ));
 
         return $this->context->smarty->fetch($template_path);
@@ -230,21 +226,6 @@ class AdminChannelEngineController extends ModuleAdminController
         $statusCode = $result['success'] ? 200 : 400;
 
         return new JsonResponse($result, $statusCode);
-    }
-
-    /**
-     * Handle get sync status request
-     *
-     * @return JsonResponse
-     */
-    private function handleGetSyncStatus(): JsonResponse
-    {
-        $result = $this->productSyncService->getSyncStatus();
-
-        return new JsonResponse([
-            'success' => true,
-            'data' => $result
-        ], 200);
     }
 
     /**

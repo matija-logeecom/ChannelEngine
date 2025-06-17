@@ -2,9 +2,9 @@
 
 namespace ChannelEngine\Business\Proxy;
 
+use ChannelEngine\Business\Interface\Proxy\ChannelEngineProxyInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use ChannelEngine\Infrastructure\HTTP\HttpClient;
-use ChannelEngine\Business\Interface\ChannelEngineProxyInterface;
 use Exception;
 use RuntimeException;
 
@@ -80,7 +80,6 @@ class ChannelEngineProxy implements ChannelEngineProxyInterface
             if (!isset($body['Success']) || !$body['Success']) {
                 $message = $body['Message'] ?? 'Unknown error';
 
-                // Check for validation errors
                 if (isset($body['ValidationErrors']) && is_array($body['ValidationErrors'])) {
                     $errors = [];
                     foreach ($body['ValidationErrors'] as $error) {

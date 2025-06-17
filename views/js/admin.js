@@ -115,7 +115,6 @@ var ChannelEngine = {
         this.ajax.connect(accountName, apiKey,
             function(response) {
                 if (response && response.success) {
-                    alert('Connected successfully!');
                     self.closeModal();
 
                     setTimeout(function() {
@@ -150,46 +149,50 @@ var ChannelEngine = {
             syncButton.disabled = true;
         }
 
+        this.displaySyncStatus({
+            status: 'in_progress'
+        });
+
         var self = this;
 
         this.ajax.sync(
             function(response) {
+                self.resetSyncButton();
+
                 if (response && response.success) {
-                    // Start polling for status updates
-                    self.updateSyncStatus();
+                    self.displaySyncStatus({
+                        status: 'done'
+                    });
 
-                    // Show success message after a delay
-                    setTimeout(function() {
-                        if (response.errors && response.errors.length > 0) {
-                            alert('Synchronization completed with some errors. Check the logs for details.');
-                        } else {
-                            alert('Synchronization completed successfully!');
-                        }
-                    }, 1000);
-                } else {
-                    alert('Synchronization failed: ' + (response.message || 'Unknown error'));
-
-                    if (syncButton) {
-                        syncButton.textContent = 'Synchronize';
-                        syncButton.disabled = false;
+                    var message = response.message || 'Products synchronized successfully';
+                    if (response.total_products && response.synced_products) {
+                        message += ' (' + response.synced_products + '/' + response.total_products + ' products)';
                     }
-
-                    // Update status display
-                    self.updateSyncStatus();
+                } else {
+                    self.displaySyncStatus({
+                        status: 'error',
+                        error_message: response.message || 'Unknown error'
+                    });
+                    alert('Synchronization failed: ' + (response.message || 'Unknown error'));
                 }
             },
             function(error) {
+                self.resetSyncButton();
+                self.displaySyncStatus({
+                    status: 'error',
+                    error_message: error
+                });
                 alert('Synchronization failed: ' + error);
-
-                if (syncButton) {
-                    syncButton.textContent = 'Synchronize';
-                    syncButton.disabled = false;
-                }
-
-                // Update status display
-                self.updateSyncStatus();
             }
         );
+    },
+
+    resetSyncButton: function() {
+        var syncButton = document.querySelector('.sync-button');
+        if (syncButton) {
+            syncButton.textContent = 'Synchronize';
+            syncButton.disabled = false;
+        }
     },
 
     handleDisconnect: function() {
@@ -214,81 +217,39 @@ var ChannelEngine = {
         );
     },
 
-    updateSyncStatus: function() {
-        var self = this;
-
-        this.ajax.getSyncStatus(
-            function(response) {
-                if (response && response.success && response.data) {
-                    self.displaySyncStatus(response.data);
-
-                    // If sync is in progress, poll for updates
-                    if (response.data.status === 'in_progress') {
-                        setTimeout(function() {
-                            self.updateSyncStatus();
-                        }, 2000); // Poll every 2 seconds
-                    }
-                }
-            },
-            function(error) {
-                console.error('Failed to get sync status:', error);
-            }
-        );
-    },
-
     displaySyncStatus: function(statusData) {
-        var statusElements = {
-            done: document.querySelector('.status-done'),
-            progress: document.querySelector('.status-progress'),
-            error: document.querySelector('.status-error')
-        };
-
-        // Reset all statuses
-        Object.values(statusElements).forEach(function(element) {
-            if (element) {
-                element.classList.remove('active');
-            }
-        });
-
-        // Highlight current status
-        var currentStatus = statusData.status || 'done';
-        var currentElement = statusElements[currentStatus === 'in_progress' ? 'progress' : currentStatus];
-
-        if (currentElement) {
-            currentElement.classList.add('active');
+        let status;
+        if (statusData.status) {
+            status = statusData.status;
+        } else if (statusData.success) {
+            status = 'done';
+        } else {
+            status = 'error';
         }
 
-        // Update progress info if available
-        var progressElement = document.querySelector('.sync-progress');
-        if (progressElement) {
-            if (statusData.status === 'in_progress' && (statusData.total_products > 0 || statusData.synced_products > 0)) {
-                progressElement.style.display = 'block';
-                progressElement.textContent = 'Progress: ' + (statusData.synced_products || 0) + ' / ' + (statusData.total_products || 0) + ' products';
+        var statusValue = document.getElementById('sync-status-value');
+        if (statusValue) {
+            statusValue.className = '';
+
+            if (status === 'in_progress') {
+                statusValue.textContent = 'In progress';
+                statusValue.classList.add('status-in_progress');
+            } else if (status === 'error') {
+                statusValue.textContent = 'Error';
+                statusValue.classList.add('status-error');
             } else {
-                progressElement.style.display = 'none';
+                statusValue.textContent = 'Done';
+                statusValue.classList.add('status-done');
             }
         }
 
-        // Update error message if available
         var errorElement = document.querySelector('.sync-error-message');
         if (errorElement) {
-            if (statusData.status === 'error' && statusData.error_message) {
+            if (status === 'error' && statusData.error_message) {
                 errorElement.style.display = 'block';
                 errorElement.textContent = 'Error: ' + statusData.error_message;
             } else {
                 errorElement.style.display = 'none';
-            }
-        }
-
-        // Update sync button
-        var syncButton = document.querySelector('.sync-button');
-        if (syncButton) {
-            if (statusData.status === 'in_progress') {
-                syncButton.textContent = 'Synchronizing...';
-                syncButton.disabled = true;
-            } else {
-                syncButton.textContent = 'Synchronize';
-                syncButton.disabled = false;
             }
         }
     }
@@ -297,17 +258,7 @@ var ChannelEngine = {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
         ChannelEngine.init();
-
-        // Update sync status on sync page load
-        if (document.querySelector('.sync-status-container')) {
-            ChannelEngine.updateSyncStatus();
-        }
     });
 } else {
     ChannelEngine.init();
-
-    // Update sync status on sync page load
-    if (document.querySelector('.sync-status-container')) {
-        ChannelEngine.updateSyncStatus();
-    }
 }

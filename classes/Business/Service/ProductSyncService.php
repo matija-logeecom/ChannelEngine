@@ -2,16 +2,16 @@
 
 namespace ChannelEngine\Business\Service;
 
-use ChannelEngine\Business\Interface\ProductSyncServiceInterface;
-use ChannelEngine\Business\Interface\ChannelEngineProxyInterface;
-use ChannelEngine\Business\Interface\ConfigurationRepositoryInterface;
-use ChannelEngine\Business\Interface\ProductRepositoryInterface;
 use ChannelEngine\Business\DTO\Product;
+use ChannelEngine\Business\Interface\Proxy\ChannelEngineProxyInterface;
+use ChannelEngine\Business\Interface\Repository\ConfigurationRepositoryInterface;
+use ChannelEngine\Business\Interface\Repository\ProductRepositoryInterface;
+use ChannelEngine\Business\Interface\Service\ProductSyncServiceInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
-use Exception;
-use RuntimeException;
-use PrestaShopLogger;
 use Configuration;
+use Exception;
+use PrestaShopLogger;
+use RuntimeException;
 
 class ProductSyncService implements ProductSyncServiceInterface
 {
@@ -19,7 +19,6 @@ class ProductSyncService implements ProductSyncServiceInterface
     private ChannelEngineProxyInterface $channelEngineProxy;
     private ProductRepositoryInterface $productRepository;
 
-    // Batch size for product sync
     private const BATCH_SIZE = 100;
 
     public function __construct()

@@ -57,16 +57,19 @@
 
 .status-done {
     color: #28a745;
+    font-size: 20px;
     font-weight: 500;
 }
 
 .status-progress {
     color: #fd7e14;
+    font-size: 20px;
     font-weight: 500;
 }
 
 .status-error {
     color: #dc3545;
+    font-size: 20px;
     font-weight: 500;
 }
 
@@ -110,7 +113,6 @@
 }
 
 .sync-progress {
-    font-size: 14px;
     color: #4A90E2;
     margin-top: 10px;
     font-weight: 500;
@@ -133,23 +135,52 @@
     font-weight: bold;
     padding: 3px 8px;
     border-radius: 5px;
-    display: inline-block; /* Helps with background color and padding */
+    display: inline-block;
     margin-left: 5px;
 }
 
+#sync-status-value {
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 5px;
+    display: inline-block;
+    margin-top: 10px;
+}
+
 #sync-status-value.status-done {
-    color: #1a642f; /* Dark Green */
+    color: #1a642f;
     background-color: #e9f7ef;
 }
 
-/* Orange for "In progress" */
 #sync-status-value.status-in_progress {
-    color: #995400; /* Dark Orange */
+    color: #995400;
+    font-size: 20px;
     background-color: #fff4e6;
 }
 
-/* Red for "Error" */
 #sync-status-value.status-error {
-    color: #a51f24; /* Dark Red */
+    color: #a51f24;
     background-color: #fbebed;
+}
+
+.status-done, .status-progress, .status-error, .status-separator {
+    display: none;
+}
+
+.sync-status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sync-status-label {
+    font-size: 20px;
+    color: #333;
+    font-weight: 500;
+    margin: 0;
+}
+
+#sync-status-value {
+    margin-top: 0;
+    margin-left: 0;
 }

@@ -63,7 +63,7 @@ class ChannelEngine extends Module
             if ($parentTab && Validate::isLoadedObject($parentTab)) {
                 $parentTabId = (int)$parentTab->id;
             } else {
-                $parentTabId = 2; // Default Orders Tab id
+                $parentTabId = 2;
             }
 
             $tab = new Tab();
@@ -72,7 +72,8 @@ class ChannelEngine extends Module
             $tab->name = [];
 
             foreach (Language::getLanguages(true) as $lang) {
-                $tab->name[$lang['id_lang']] = $this->trans('Channel Engine', [], 'Modules.ChannelEngine.Admin');
+                $tab->name[$lang['id_lang']] = $this->trans('Channel Engine', [],
+                    'Modules.ChannelEngine.Admin');
             }
 
             $tab->id_parent = $parentTabId;
@@ -102,6 +103,7 @@ class ChannelEngine extends Module
 
         } catch (Exception $e) {
             PrestaShopLogger::addLog('ChannelEngine: Tab uninstall failed: ' . $e->getMessage(), 3);
+
             return false;
         }
     }

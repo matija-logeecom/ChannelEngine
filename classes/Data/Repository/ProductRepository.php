@@ -2,10 +2,10 @@
 
 namespace ChannelEngine\Data\Repository;
 
-use ChannelEngine\Business\Interface\ProductRepositoryInterface;
+use ChannelEngine\Business\Interface\Repository\ProductRepositoryInterface;
 use Context;
-use Product;
 use Manufacturer;
+use Product;
 use Validate;
 
 class ProductRepository implements ProductRepositoryInterface
@@ -119,6 +119,7 @@ class ProductRepository implements ProductRepositoryInterface
      * Get the final price of a product including tax and specific prices
      *
      * @param int $productId
+     *
      * @return float
      */
     private function getProductFinalPrice(int $productId): float

@@ -2,13 +2,13 @@
 
 namespace ChannelEngine\Infrastructure;
 
-use ChannelEngine\Business\Interface\ChannelEngineProxyInterface;
-use ChannelEngine\Business\Interface\ConfigurationRepositoryInterface;
-use ChannelEngine\Business\Interface\ProductRepositoryInterface;
-use ChannelEngine\Business\Interface\ProductSyncServiceInterface;
+use ChannelEngine\Business\Interface\Proxy\ChannelEngineProxyInterface;
+use ChannelEngine\Business\Interface\Repository\ConfigurationRepositoryInterface;
+use ChannelEngine\Business\Interface\Repository\ProductRepositoryInterface;
+use ChannelEngine\Business\Interface\Service\AuthorizationServiceInterface;
+use ChannelEngine\Business\Interface\Service\ProductSyncServiceInterface;
 use ChannelEngine\Business\Proxy\ChannelEngineProxy;
 use ChannelEngine\Business\Service\AuthorizationService;
-use ChannelEngine\Business\Interface\AuthorizationServiceInterface;
 use ChannelEngine\Business\Service\ProductSyncService;
 use ChannelEngine\Data\Repository\ConfigurationRepository;
 use ChannelEngine\Data\Repository\ProductRepository;
@@ -44,8 +44,6 @@ class Bootstrap
             ServiceRegistry::set(AuthorizationServiceInterface::class, new AuthorizationService());
 
             ServiceRegistry::set(ProductRepositoryInterface::class, new ProductRepository());
-
-            ServiceRegistry::set(ProductSyncServiceInterface::class, new ProductSyncService());
 
             ServiceRegistry::set(ProductSyncServiceInterface::class, new ProductSyncService());
         } catch (\Throwable $e) {

@@ -56,4 +56,50 @@ class ChannelEngineProxy implements ChannelEngineProxyInterface
             throw new Exception('Failed to get ChannelEngine settings: ' . $e->getMessage());
         }
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function syncProducts(string $accountName, string $apiKey, array $products): array
+    {
+        $url = "https://{$accountName}.channelengine.net/api/v2/products";
+
+        $this->httpClient->setDefaultHeaders([
+            'X-CE-KEY' => $apiKey,
+            'Content-Type' => 'application/json'
+        ]);
+
+        try {
+            $response = $this->httpClient->post($url, $products);
+
+            if ($response['status_code'] !== 201 && $response['status_code'] !== 200) {
+                throw new Exception('Failed to sync products: HTTP ' . $response['status_code']);
+            }
+
+            $body = $response['body'];
+            if (!isset($body['Success']) || !$body['Success']) {
+                $message = $body['Message'] ?? 'Unknown error';
+
+                // Check for validation errors
+                if (isset($body['ValidationErrors']) && is_array($body['ValidationErrors'])) {
+                    $errors = [];
+                    foreach ($body['ValidationErrors'] as $error) {
+                        $errors[] = $error['Message'] ?? $error;
+                    }
+                    $message .= ' Validation errors: ' . implode(', ', $errors);
+                }
+
+                throw new Exception($message);
+            }
+
+            return [
+                'success' => true,
+                'message' => $body['Message'] ?? 'Products synchronized successfully',
+                'content' => $body['Content'] ?? []
+            ];
+
+        } catch (Exception $e) {
+            throw new Exception('Failed to sync products to ChannelEngine: ' . $e->getMessage());
+        }
+    }
 }

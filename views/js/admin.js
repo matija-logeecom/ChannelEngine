@@ -155,18 +155,27 @@ var ChannelEngine = {
         this.ajax.sync(
             function(response) {
                 if (response && response.success) {
-                    alert('Synchronization completed successfully!');
-                    // Optionally reload the page to refresh sync status
+                    // Start polling for status updates
+                    self.updateSyncStatus();
+
+                    // Show success message after a delay
                     setTimeout(function() {
-                        window.location.reload();
+                        if (response.errors && response.errors.length > 0) {
+                            alert('Synchronization completed with some errors. Check the logs for details.');
+                        } else {
+                            alert('Synchronization completed successfully!');
+                        }
                     }, 1000);
                 } else {
                     alert('Synchronization failed: ' + (response.message || 'Unknown error'));
-                }
 
-                if (syncButton) {
-                    syncButton.textContent = 'Synchronize';
-                    syncButton.disabled = false;
+                    if (syncButton) {
+                        syncButton.textContent = 'Synchronize';
+                        syncButton.disabled = false;
+                    }
+
+                    // Update status display
+                    self.updateSyncStatus();
                 }
             },
             function(error) {
@@ -176,6 +185,9 @@ var ChannelEngine = {
                     syncButton.textContent = 'Synchronize';
                     syncButton.disabled = false;
                 }
+
+                // Update status display
+                self.updateSyncStatus();
             }
         );
     },
@@ -209,6 +221,13 @@ var ChannelEngine = {
             function(response) {
                 if (response && response.success && response.data) {
                     self.displaySyncStatus(response.data);
+
+                    // If sync is in progress, poll for updates
+                    if (response.data.status === 'in_progress') {
+                        setTimeout(function() {
+                            self.updateSyncStatus();
+                        }, 2000); // Poll every 2 seconds
+                    }
                 }
             },
             function(error) {
@@ -227,8 +246,7 @@ var ChannelEngine = {
         // Reset all statuses
         Object.values(statusElements).forEach(function(element) {
             if (element) {
-                element.style.fontWeight = 'normal';
-                element.style.textDecoration = 'none';
+                element.classList.remove('active');
             }
         });
 
@@ -237,8 +255,41 @@ var ChannelEngine = {
         var currentElement = statusElements[currentStatus === 'in_progress' ? 'progress' : currentStatus];
 
         if (currentElement) {
-            currentElement.style.fontWeight = 'bold';
-            currentElement.style.textDecoration = 'underline';
+            currentElement.classList.add('active');
+        }
+
+        // Update progress info if available
+        var progressElement = document.querySelector('.sync-progress');
+        if (progressElement) {
+            if (statusData.status === 'in_progress' && (statusData.total_products > 0 || statusData.synced_products > 0)) {
+                progressElement.style.display = 'block';
+                progressElement.textContent = 'Progress: ' + (statusData.synced_products || 0) + ' / ' + (statusData.total_products || 0) + ' products';
+            } else {
+                progressElement.style.display = 'none';
+            }
+        }
+
+        // Update error message if available
+        var errorElement = document.querySelector('.sync-error-message');
+        if (errorElement) {
+            if (statusData.status === 'error' && statusData.error_message) {
+                errorElement.style.display = 'block';
+                errorElement.textContent = 'Error: ' + statusData.error_message;
+            } else {
+                errorElement.style.display = 'none';
+            }
+        }
+
+        // Update sync button
+        var syncButton = document.querySelector('.sync-button');
+        if (syncButton) {
+            if (statusData.status === 'in_progress') {
+                syncButton.textContent = 'Synchronizing...';
+                syncButton.disabled = true;
+            } else {
+                syncButton.textContent = 'Synchronize';
+                syncButton.disabled = false;
+            }
         }
     }
 };

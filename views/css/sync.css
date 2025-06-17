@@ -95,3 +95,61 @@
     outline: none;
     box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.3);
 }
+
+.status-done.active,
+.status-progress.active,
+.status-error.active {
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+.sync-last-run {
+    font-size: 14px;
+    color: #666;
+    margin-top: 15px;
+}
+
+.sync-progress {
+    font-size: 14px;
+    color: #4A90E2;
+    margin-top: 10px;
+    font-weight: 500;
+}
+
+.sync-error-message {
+    font-size: 14px;
+    color: #dc3545;
+    margin-top: 10px;
+    max-width: 400px;
+    word-wrap: break-word;
+}
+
+.sync-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+#sync-status-value {
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 5px;
+    display: inline-block; /* Helps with background color and padding */
+    margin-left: 5px;
+}
+
+#sync-status-value.status-done {
+    color: #1a642f; /* Dark Green */
+    background-color: #e9f7ef;
+}
+
+/* Orange for "In progress" */
+#sync-status-value.status-in_progress {
+    color: #995400; /* Dark Orange */
+    background-color: #fff4e6;
+}
+
+/* Red for "Error" */
+#sync-status-value.status-error {
+    color: #a51f24; /* Dark Red */
+    background-color: #fbebed;
+}

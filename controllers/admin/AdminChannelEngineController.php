@@ -58,37 +58,6 @@ class AdminChannelEngineController extends ModuleAdminController
     }
 
     /**
-     * Render the welcome/connection page
-     *
-     * @return string
-     *
-     * @throws Exception
-     */
-    private function renderWelcomePage(): string
-    {
-        $this->context->controller->addCSS($this->module->getPathUri() . 'views/css/admin.css');
-        $this->context->controller->addJS($this->module->getPathUri() . 'views/js/ChannelEngineAjax.js');
-        $this->context->controller->addJS($this->module->getPathUri() . 'views/js/admin.js');
-
-        $template_path = $this->module->getLocalPath() . 'views/templates/admin/welcome.tpl';
-
-        try {
-            $connectionInfo = $this->authService->getConnectionStatus();
-        } catch (Exception $e) {
-            $connectionInfo = ['data' => ['is_connected' => false]];
-        }
-
-        $this->context->smarty->assign(array(
-            'module_dir' => $this->module->getPathUri(),
-            'module_name' => $this->module->name,
-            'module_version' => $this->module->version,
-            'connection_info' => $connectionInfo['data']
-        ));
-
-        return $this->context->smarty->fetch($template_path);
-    }
-
-    /**
      * Handle AJAX requests - routes to appropriate action handlers
      *
      * @return void
@@ -127,6 +96,79 @@ class AdminChannelEngineController extends ModuleAdminController
     }
 
     /**
+     * Render the welcome/connection page
+     *
+     * @return string
+     *
+     * @throws Exception
+     */
+    private function renderWelcomePage(): string
+    {
+        $this->addAssets();
+
+        $template_path = $this->module->getLocalPath() . 'views/templates/admin/welcome.tpl';
+
+        try {
+            $connectionInfo = $this->authService->getConnectionStatus();
+        } catch (Exception $e) {
+            $connectionInfo = ['data' => ['is_connected' => false]];
+        }
+
+        $this->context->smarty->assign(array(
+            'module_dir' => $this->module->getPathUri(),
+            'module_name' => $this->module->name,
+            'module_version' => $this->module->version,
+            'connection_info' => $connectionInfo['data']
+        ));
+
+        return $this->context->smarty->fetch($template_path);
+    }
+
+    /**
+     * Render the synchronization page
+     *
+     * @return string
+     *
+     * @throws Exception
+     */
+    private function renderSyncPage(): string
+    {
+        $this->addAssets();
+        $this->context->controller->addCSS($this->module->getPathUri() . 'views/css/sync.css');
+
+        $template_path = $this->module->getLocalPath() . 'views/templates/admin/sync.tpl';
+
+        try {
+            $connectionInfo = $this->authService->getConnectionStatus();
+            $syncStatus = $this->productSyncService->getSyncStatus();
+        } catch (Exception $e) {
+            $connectionInfo = ['data' => []];
+            $syncStatus = ['status' => 'error'];
+        }
+
+        $this->context->smarty->assign(array(
+            'module_dir' => $this->module->getPathUri(),
+            'module_name' => $this->module->name,
+            'connection_info' => $connectionInfo['data'],
+            'sync_status' => $syncStatus
+        ));
+
+        return $this->context->smarty->fetch($template_path);
+    }
+
+    /**
+     * Add common CSS and JS assets
+     *
+     * @return void
+     */
+    private function addAssets(): void
+    {
+        $this->context->controller->addCSS($this->module->getPathUri() . 'views/css/admin.css');
+        $this->context->controller->addJS($this->module->getPathUri() . 'views/js/ChannelEngineAjax.js');
+        $this->context->controller->addJS($this->module->getPathUri() . 'views/js/admin.js');
+    }
+
+    /**
      * Handle connection request
      *
      * @param array $requestData
@@ -139,7 +181,11 @@ class AdminChannelEngineController extends ModuleAdminController
         $apiKey = $requestData['api_key'] ?? '';
 
         if (empty($accountName) || empty($apiKey)) {
-            return $this->createErrorResponse('Account name and API key are required', 400, 'MISSING_CREDENTIALS');
+            return $this->createErrorResponse(
+                'Account name and API key are required',
+                400,
+                'MISSING_CREDENTIALS'
+            );
         }
 
         $result = $this->authService->authorizeConnection($accountName, $apiKey);
@@ -210,8 +256,11 @@ class AdminChannelEngineController extends ModuleAdminController
      *
      * @return JsonResponse
      */
-    private function createErrorResponse(string $message, int $statusCode, ?string $errorCode = null): JsonResponse
-    {
+    private function createErrorResponse(
+        string $message,
+        int $statusCode,
+        ?string $errorCode = null
+    ): JsonResponse {
         $data = [
             'success' => false,
             'message' => $message
@@ -222,39 +271,5 @@ class AdminChannelEngineController extends ModuleAdminController
         }
 
         return new JsonResponse($data, $statusCode);
-    }
-
-    /**
-     * Render the synchronization page
-     *
-     * @return string
-     *
-     * @throws Exception
-     */
-    private function renderSyncPage(): string
-    {
-        $this->context->controller->addCSS($this->module->getPathUri() . 'views/css/admin.css');
-        $this->context->controller->addCSS($this->module->getPathUri() . 'views/css/sync.css');
-        $this->context->controller->addJS($this->module->getPathUri() . 'views/js/ChannelEngineAjax.js');
-        $this->context->controller->addJS($this->module->getPathUri() . 'views/js/admin.js');
-
-        $template_path = $this->module->getLocalPath() . 'views/templates/admin/sync.tpl';
-
-        try {
-            $connectionInfo = $this->authService->getConnectionStatus();
-            $syncStatus = $this->productSyncService->getSyncStatus();
-        } catch (Exception $e) {
-            $connectionInfo = ['data' => []];
-            $syncStatus = ['status' => 'error'];
-        }
-
-        $this->context->smarty->assign(array(
-            'module_dir' => $this->module->getPathUri(),
-            'module_name' => $this->module->name,
-            'connection_info' => $connectionInfo['data'],
-            'sync_status' => $syncStatus
-        ));
-
-        return $this->context->smarty->fetch($template_path);
     }
 }

@@ -27,4 +27,13 @@ interface ProductSyncServiceInterface
      * @return bool
      */
     public function updateSyncStatus(string $status, array $data = []): bool;
+
+    /**
+     * Syncs product with provided ID
+     *
+     * @param int $productId
+     *
+     * @return array
+     */
+    public function syncSingleProduct(int $productId): array;
 }

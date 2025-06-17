@@ -118,6 +118,55 @@ class ProductSyncService implements ProductSyncServiceInterface
         }
     }
 
+    /**
+     * @inheritDoc
+     */
+    public function syncSingleProduct(int $productId): array
+    {
+        if (!$this->configRepository->hasCredentials()) {
+            return $this->createErrorResponse('Not connected to ChannelEngine', 'NOT_CONNECTED');
+        }
+
+        try {
+            $credentials = $this->getCredentials();
+            $product = $this->productRepository->getProductById($productId);
+
+            if (!$product) {
+                return $this->createErrorResponse(
+                    "Product with ID $productId not found or inactive",
+                    'PRODUCT_NOT_FOUND'
+                );
+            }
+
+            $productDto = Product::fromPrestashopProduct($product);
+            $productData = [$productDto->toArray()];
+
+            $result = $this->channelEngineProxy->syncProducts(
+                $credentials['account_name'],
+                $credentials['api_key'],
+                $productData
+            );
+
+            if ($result['success']) {
+                $this->logInfo("Single product sync successful for product ID: $productId");
+                return [
+                    'success' => true,
+                    'message' => "Product $productId synchronized successfully",
+                    'product_id' => $productId,
+                    'product_name' => $product['name'] ?? ''
+                ];
+            } else {
+                throw new Exception($result['message'] ?? 'Unknown sync error');
+            }
+
+        } catch (Exception $e) {
+            $this->logError("Single product sync failed for product ID $productId: " . $e->getMessage());
+            return $this->createErrorResponse(
+                "Failed to sync product $productId: " . $e->getMessage(),
+                'SYNC_ERROR'
+            );
+        }
+    }
 
     /**
      * Get credentials from configuration
@@ -134,7 +183,6 @@ class ProductSyncService implements ProductSyncServiceInterface
         }
         return $credentials;
     }
-
 
     /**
      * Create new scratch file from selection

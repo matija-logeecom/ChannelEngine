@@ -2,6 +2,7 @@
 
 use ChannelEngine\Infrastructure\Bootstrap;
 use ChannelEngine\Infrastructure\Response\HtmlResponse;
+use ChannelEngine\Presentation\Controller\ProductHookController;
 
 if (!defined('_PS_VERSION_')) {
     exit;
@@ -17,6 +18,8 @@ try {
 
 class ChannelEngine extends Module
 {
+    private ?ProductHookController $productHookController = null;
+
     public function __construct()
     {
         $this->name = 'channelengine';
@@ -45,12 +48,69 @@ class ChannelEngine extends Module
 
     public function install(): bool
     {
-        return parent::install() && $this->installTab();
+        return parent::install() &&
+            $this->installTab() &&
+            $this->registerHooks();
     }
 
     public function uninstall(): bool
     {
         return parent::uninstall() && $this->uninstallTab();
+    }
+
+    /**
+     * Register hooks for product synchronization
+     */
+    private function registerHooks(): bool
+    {
+        return $this->registerHook('actionProductAdd') &&
+            $this->registerHook('actionProductUpdate');
+    }
+
+    /**
+     * Get or create the product hook controller
+     */
+    private function getProductHookController(): ProductHookController
+    {
+        if ($this->productHookController === null) {
+            try {
+                $this->productHookController = new ProductHookController();
+            } catch (Exception $e) {
+                PrestaShopLogger::addLog(
+                    'ChannelEngine: Failed to initialize ProductHookController: ' . $e->getMessage(),
+                    3,
+                    null,
+                    'ChannelEngine'
+                );
+                throw $e;
+            }
+        }
+
+        return $this->productHookController;
+    }
+
+    /**
+     * Hook: Product added - sync to ChannelEngine
+     */
+    public function hookActionProductAdd($params): void
+    {
+        try {
+            $this->getProductHookController()->handleProductAdd($params);
+        } catch (Exception $e) {
+            return;
+        }
+    }
+
+    /**
+     * Hook: Product updated - sync to ChannelEngine
+     */
+    public function hookActionProductUpdate($params): void
+    {
+        try {
+            $this->getProductHookController()->handleProductUpdate($params);
+        } catch (Exception $e) {
+            return;
+        }
     }
 
     private function installTab(): bool
@@ -72,8 +132,7 @@ class ChannelEngine extends Module
             $tab->name = [];
 
             foreach (Language::getLanguages(true) as $lang) {
-                $tab->name[$lang['id_lang']] = $this->trans('Channel Engine', [],
-                    'Modules.ChannelEngine.Admin');
+                $tab->name[$lang['id_lang']] = $this->trans('Channel Engine', [], 'Modules.ChannelEngine.Admin');
             }
 
             $tab->id_parent = $parentTabId;
@@ -103,7 +162,6 @@ class ChannelEngine extends Module
 
         } catch (Exception $e) {
             PrestaShopLogger::addLog('ChannelEngine: Tab uninstall failed: ' . $e->getMessage(), 3);
-
             return false;
         }
     }

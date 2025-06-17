@@ -4,8 +4,11 @@ namespace ChannelEngine\Infrastructure;
 
 use ChannelEngine\Business\Interface\ChannelEngineProxyInterface;
 use ChannelEngine\Business\Interface\ConfigurationRepositoryInterface;
+use ChannelEngine\Business\Interface\ProductSyncServiceInterface;
 use ChannelEngine\Business\Proxy\ChannelEngineProxy;
 use ChannelEngine\Business\Service\AuthorizationService;
+use ChannelEngine\Business\Interface\AuthorizationServiceInterface;
+use ChannelEngine\Business\Service\ProductSyncService;
 use ChannelEngine\Data\Repository\ConfigurationRepository;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use ChannelEngine\Infrastructure\HTTP\HttpClient;
@@ -36,7 +39,9 @@ class Bootstrap
 
             ServiceRegistry::set(ChannelEngineProxyInterface::class, new ChannelEngineProxy());
 
-            ServiceRegistry::set(AuthorizationService::class, new AuthorizationService());
+            ServiceRegistry::set(AuthorizationServiceInterface::class, new AuthorizationService());
+
+            ServiceRegistry::set(ProductSyncServiceInterface::class, new ProductSyncService());
         } catch (\Throwable $e) {
             error_log("CRITICAL BOOTSTRAP FAILURE in init(): " .
                 $e->getMessage() . "\n" . $e->getTraceAsString());

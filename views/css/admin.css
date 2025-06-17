@@ -103,7 +103,6 @@
     box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.3);
 }
 
-/* Modal Styles */
 .channelengine-modal {
     display: none;
     position: fixed;
@@ -245,7 +244,6 @@
     background-color: #e9ecef;
 }
 
-/* Animations */
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -262,7 +260,6 @@
     }
 }
 
-/* Image placeholders - replace with actual images */
 .channelengine-logo.with-image {
     background-image: url('../img/channelEngineBanner.png');
     background-size: contain;

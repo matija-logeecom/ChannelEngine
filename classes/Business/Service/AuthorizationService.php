@@ -2,13 +2,14 @@
 
 namespace ChannelEngine\Business\Service;
 
+use ChannelEngine\Business\Interface\AuthorizationServiceInterface;
 use ChannelEngine\Business\Interface\ChannelEngineProxyInterface;
 use ChannelEngine\Business\Interface\ConfigurationRepositoryInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use Exception;
 use RuntimeException;
 
-class AuthorizationService
+class AuthorizationService implements AuthorizationServiceInterface
 {
     private ConfigurationRepositoryInterface $configRepository;
     private ChannelEngineProxyInterface $channelEngineProxy;
@@ -29,13 +30,7 @@ class AuthorizationService
     }
 
     /**
-     * Authorize connection with ChannelEngine
-     * Validates credentials via API and saves them if successful
-     *
-     * @param string $accountName
-     * @param string $apiKey
-     *
-     * @return array
+     * @inheritDoc
      */
     public function authorizeConnection(string $accountName, string $apiKey): array
     {
@@ -97,9 +92,7 @@ class AuthorizationService
     }
 
     /**
-     * Get current connection status
-     *
-     * @return array
+     * @inheritDoc
      */
     public function getConnectionStatus(): array
     {
@@ -112,9 +105,7 @@ class AuthorizationService
     }
 
     /**
-     * Check if currently connected
-     *
-     * @return bool
+     * @inheritDoc
      */
     public function isConnected(): bool
     {
@@ -123,9 +114,7 @@ class AuthorizationService
     }
 
     /**
-     * Disconnect and clear credentials
-     *
-     * @return array
+     * @inheritDoc
      */
     public function disconnect(): array
     {

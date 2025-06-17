@@ -183,6 +183,18 @@ ChannelEngineAjax.prototype.getStatus = function(callback, errorCallback) {
     }, callback, errorCallback);
 };
 
+ChannelEngineAjax.prototype.sync = function(callback, errorCallback) {
+    this.post({
+        action: 'sync'
+    }, callback, errorCallback);
+};
+
+ChannelEngineAjax.prototype.getSyncStatus = function(callback, errorCallback) {
+    this.get({
+        action: 'sync_status'
+    }, callback, errorCallback);
+};
+
 ChannelEngineAjax.prototype.testConnection = function(callback, errorCallback) {
     this.get({
         action: 'test'

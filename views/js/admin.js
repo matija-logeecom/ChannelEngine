@@ -143,7 +143,41 @@ var ChannelEngine = {
 
     handleSync: function() {
         console.log('ChannelEngine: handleSync called');
-        alert('Sync functionality will be implemented in the next phase');
+
+        var syncButton = document.querySelector('.sync-button');
+        if (syncButton) {
+            syncButton.textContent = 'Synchronizing...';
+            syncButton.disabled = true;
+        }
+
+        var self = this;
+
+        this.ajax.sync(
+            function(response) {
+                if (response && response.success) {
+                    alert('Synchronization completed successfully!');
+                    // Optionally reload the page to refresh sync status
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    alert('Synchronization failed: ' + (response.message || 'Unknown error'));
+                }
+
+                if (syncButton) {
+                    syncButton.textContent = 'Synchronize';
+                    syncButton.disabled = false;
+                }
+            },
+            function(error) {
+                alert('Synchronization failed: ' + error);
+
+                if (syncButton) {
+                    syncButton.textContent = 'Synchronize';
+                    syncButton.disabled = false;
+                }
+            }
+        );
     },
 
     handleDisconnect: function() {
@@ -166,13 +200,63 @@ var ChannelEngine = {
                 alert('Disconnect failed: ' + error);
             }
         );
+    },
+
+    updateSyncStatus: function() {
+        var self = this;
+
+        this.ajax.getSyncStatus(
+            function(response) {
+                if (response && response.success && response.data) {
+                    self.displaySyncStatus(response.data);
+                }
+            },
+            function(error) {
+                console.error('Failed to get sync status:', error);
+            }
+        );
+    },
+
+    displaySyncStatus: function(statusData) {
+        var statusElements = {
+            done: document.querySelector('.status-done'),
+            progress: document.querySelector('.status-progress'),
+            error: document.querySelector('.status-error')
+        };
+
+        // Reset all statuses
+        Object.values(statusElements).forEach(function(element) {
+            if (element) {
+                element.style.fontWeight = 'normal';
+                element.style.textDecoration = 'none';
+            }
+        });
+
+        // Highlight current status
+        var currentStatus = statusData.status || 'done';
+        var currentElement = statusElements[currentStatus === 'in_progress' ? 'progress' : currentStatus];
+
+        if (currentElement) {
+            currentElement.style.fontWeight = 'bold';
+            currentElement.style.textDecoration = 'underline';
+        }
     }
 };
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
         ChannelEngine.init();
+
+        // Update sync status on sync page load
+        if (document.querySelector('.sync-status-container')) {
+            ChannelEngine.updateSyncStatus();
+        }
     });
 } else {
     ChannelEngine.init();
+
+    // Update sync status on sync page load
+    if (document.querySelector('.sync-status-container')) {
+        ChannelEngine.updateSyncStatus();
+    }
 }

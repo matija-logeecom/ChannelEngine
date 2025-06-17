@@ -1,13 +1,15 @@
 <?php
 
-use ChannelEngine\Business\Service\AuthorizationService;
+use ChannelEngine\Business\Interface\AuthorizationServiceInterface;
+use ChannelEngine\Business\Interface\ProductSyncServiceInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use ChannelEngine\Infrastructure\Request\Request;
 use ChannelEngine\Infrastructure\Response\JsonResponse;
 
 class AdminChannelEngineController extends ModuleAdminController
 {
-    private AuthorizationService $authService;
+    private AuthorizationServiceInterface $authService;
+    private ProductSyncServiceInterface $productSyncService;
 
     public function __construct()
     {
@@ -19,10 +21,11 @@ class AdminChannelEngineController extends ModuleAdminController
         $this->meta_title = $this->trans('Channel Engine');
 
         try {
-            $this->authService = ServiceRegistry::get(AuthorizationService::class);
+            $this->authService = ServiceRegistry::get(AuthorizationServiceInterface::class);
+            $this->productSyncService = ServiceRegistry::get(ProductSyncServiceInterface::class);
         } catch (Exception $e) {
             error_log("CRITICAL: AdminChannelEngineController could not be initialized.
-             Failed to get AuthorizationService. Original error: " . $e->getMessage());
+             Failed to get required services. Original error: " . $e->getMessage());
             throw new RuntimeException(
                 "AdminChannelEngineController failed to initialize due to a
                  missing critical dependency.", 0, $e
@@ -104,6 +107,8 @@ class AdminChannelEngineController extends ModuleAdminController
                 'connect' => $this->handleConnect($requestData),
                 'disconnect' => $this->handleDisconnect(),
                 'status' => $this->handleGetStatus(),
+                'sync' => $this->handleSync(),
+                'sync_status' => $this->handleGetSyncStatus(),
                 default => $this->createErrorResponse('Invalid action', 400)
             };
 
@@ -169,6 +174,34 @@ class AdminChannelEngineController extends ModuleAdminController
     }
 
     /**
+     * Handle product sync request
+     *
+     * @return JsonResponse
+     */
+    private function handleSync(): JsonResponse
+    {
+        $result = $this->productSyncService->syncAllProducts();
+        $statusCode = $result['success'] ? 200 : 400;
+
+        return new JsonResponse($result, $statusCode);
+    }
+
+    /**
+     * Handle get sync status request
+     *
+     * @return JsonResponse
+     */
+    private function handleGetSyncStatus(): JsonResponse
+    {
+        $result = $this->productSyncService->getSyncStatus();
+
+        return new JsonResponse([
+            'success' => true,
+            'data' => $result
+        ], 200);
+    }
+
+    /**
      * Create a standardized error response
      *
      * @param string $message
@@ -202,19 +235,24 @@ class AdminChannelEngineController extends ModuleAdminController
     {
         $this->context->controller->addCSS($this->module->getPathUri() . 'views/css/admin.css');
         $this->context->controller->addCSS($this->module->getPathUri() . 'views/css/sync.css');
+        $this->context->controller->addJS($this->module->getPathUri() . 'views/js/ChannelEngineAjax.js');
+        $this->context->controller->addJS($this->module->getPathUri() . 'views/js/admin.js');
 
         $template_path = $this->module->getLocalPath() . 'views/templates/admin/sync.tpl';
 
         try {
             $connectionInfo = $this->authService->getConnectionStatus();
+            $syncStatus = $this->productSyncService->getSyncStatus();
         } catch (Exception $e) {
             $connectionInfo = ['data' => []];
+            $syncStatus = ['status' => 'error'];
         }
 
         $this->context->smarty->assign(array(
             'module_dir' => $this->module->getPathUri(),
             'module_name' => $this->module->name,
-            'connection_info' => $connectionInfo['data']
+            'connection_info' => $connectionInfo['data'],
+            'sync_status' => $syncStatus
         ));
 
         return $this->context->smarty->fetch($template_path);

@@ -26,6 +26,8 @@ interface ChannelEngineProxyInterface
      * @param array $products
      *
      * @return array
+     *
+     * @throws Exception
      */
     public function syncProducts(string $accountName, string $apiKey, array $products): array;
 }

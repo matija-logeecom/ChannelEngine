@@ -1,8 +1,9 @@
 <?php
 
+use ChannelEngine\Business\Interface\Service\ProductSyncServiceInterface;
 use ChannelEngine\Infrastructure\Bootstrap;
+use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use ChannelEngine\Infrastructure\Response\HtmlResponse;
-use ChannelEngine\Presentation\Controller\ProductHookController;
 
 if (!defined('_PS_VERSION_')) {
     exit;
@@ -10,16 +11,10 @@ if (!defined('_PS_VERSION_')) {
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-try {
-    Bootstrap::init();
-} catch (Throwable $e) {
-    HtmlResponse::createInternalServerError()->view();
-}
+Bootstrap::init();
 
 class ChannelEngine extends Module
 {
-    private ?ProductHookController $productHookController = null;
-
     public function __construct()
     {
         $this->name = 'channelengine';
@@ -46,6 +41,11 @@ class ChannelEngine extends Module
         }
     }
 
+    /**
+     * Install the module and register necessary hooks
+     *
+     * @return bool
+     */
     public function install(): bool
     {
         return parent::install() &&
@@ -53,6 +53,11 @@ class ChannelEngine extends Module
             $this->registerHooks();
     }
 
+    /**
+     * Uninstall the module and clean up
+     *
+     * @return bool
+     */
     public function uninstall(): bool
     {
         return parent::uninstall() && $this->uninstallTab();
@@ -60,6 +65,8 @@ class ChannelEngine extends Module
 
     /**
      * Register hooks for product synchronization
+     *
+     * @return bool
      */
     private function registerHooks(): bool
     {
@@ -68,51 +75,85 @@ class ChannelEngine extends Module
     }
 
     /**
-     * Get or create the product hook controller
-     */
-    private function getProductHookController(): ProductHookController
-    {
-        if ($this->productHookController === null) {
-            try {
-                $this->productHookController = new ProductHookController();
-            } catch (Exception $e) {
-                PrestaShopLogger::addLog(
-                    'ChannelEngine: Failed to initialize ProductHookController: ' . $e->getMessage(),
-                    3,
-                    null,
-                    'ChannelEngine'
-                );
-                throw $e;
-            }
-        }
-
-        return $this->productHookController;
-    }
-
-    /**
      * Hook: Product added - sync to ChannelEngine
+     *
+     * @param array $params Hook parameters containing product information
+     *
+     * @return void
      */
     public function hookActionProductAdd($params): void
     {
-        try {
-            $this->getProductHookController()->handleProductAdd($params);
-        } catch (Exception $e) {
-            return;
-        }
+        $this->handleProductSync($params);
     }
 
     /**
      * Hook: Product updated - sync to ChannelEngine
+     *
+     * @param array $params Hook parameters containing product information
+     *
+     * @return void
      */
     public function hookActionProductUpdate($params): void
     {
+        $this->handleProductSync($params);
+    }
+
+    /**
+     * Handle product synchronization for both add and update operations
+     *
+     * @param array $params Hook parameters containing product information
+     *
+     * @return void
+     */
+    private function handleProductSync(array $params): void
+    {
         try {
-            $this->getProductHookController()->handleProductUpdate($params);
+            $productId = $params['id_product'] ?? null;
+
+            if (!$productId) {
+                PrestaShopLogger::addLog(
+                    'ChannelEngine: Product sync skipped - no product ID provided in hook parameters',
+                    2,
+                    null,
+                    'ChannelEngine'
+                );
+                return;
+            }
+
+            $productSyncService = ServiceRegistry::get(ProductSyncServiceInterface::class);
+            $result = $productSyncService->syncSingleProduct((int)$productId);
+
+            if (!$result['success']) {
+                PrestaShopLogger::addLog(
+                    'ChannelEngine: Product sync failed for product ID ' . $productId . ': ' . ($result['message'] ?? 'Unknown error'),
+                    3,
+                    null,
+                    'ChannelEngine'
+                );
+            } else {
+                PrestaShopLogger::addLog(
+                    'ChannelEngine: Product sync successful for product ID ' . $productId,
+                    1,
+                    null,
+                    'ChannelEngine'
+                );
+            }
+
         } catch (Exception $e) {
-            return;
+            PrestaShopLogger::addLog(
+                'ChannelEngine: Failed to handle product sync: ' . $e->getMessage(),
+                3,
+                null,
+                'ChannelEngine'
+            );
         }
     }
 
+    /**
+     * Install admin tab for ChannelEngine management
+     *
+     * @return bool
+     */
     private function installTab(): bool
     {
         try {
@@ -141,11 +182,21 @@ class ChannelEngine extends Module
             return $tab->add();
 
         } catch (Exception $e) {
-            PrestaShopLogger::addLog('ChannelEngine: Tab installation failed: ' . $e->getMessage(), 3);
+            PrestaShopLogger::addLog(
+                'ChannelEngine: Tab installation failed: ' . $e->getMessage(),
+                3,
+                null,
+                'ChannelEngine'
+            );
             return false;
         }
     }
 
+    /**
+     * Uninstall admin tab
+     *
+     * @return bool
+     */
     private function uninstallTab(): bool
     {
         try {
@@ -161,7 +212,13 @@ class ChannelEngine extends Module
             return true;
 
         } catch (Exception $e) {
-            PrestaShopLogger::addLog('ChannelEngine: Tab uninstall failed: ' . $e->getMessage(), 3);
+            PrestaShopLogger::addLog(
+                'ChannelEngine: Tab uninstall failed: ' . $e->getMessage(),
+                3,
+                null,
+                'ChannelEngine'
+            );
+
             return false;
         }
     }

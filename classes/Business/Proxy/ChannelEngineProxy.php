@@ -6,6 +6,7 @@ use ChannelEngine\Business\Interface\Proxy\ChannelEngineProxyInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use ChannelEngine\Infrastructure\HTTP\HttpClient;
 use Exception;
+use PrestaShopLogger;
 use RuntimeException;
 
 class ChannelEngineProxy implements ChannelEngineProxyInterface
@@ -17,11 +18,17 @@ class ChannelEngineProxy implements ChannelEngineProxyInterface
         try {
             $this->httpClient = ServiceRegistry::get(HttpClient::class);
         } catch (Exception $e) {
-            error_log("CRITICAL: ChannelEngineProxy could not be initialized. " .
-                "Failed to get a required service. Original error: " . $e->getMessage());
+            PrestaShopLogger::addLog(
+                'ChannelEngine: ChannelEngineProxy could not be initialized. ' .
+                'Failed to get HttpClient service. Original error: ' . $e->getMessage(),
+                3,
+                null,
+                'ChannelEngine'
+            );
             throw new RuntimeException(
-                "ChannelEngineProxy failed to initialize due to a " .
-                "missing critical dependency.", 0, $e
+                "ChannelEngineProxy failed to initialize due to a missing critical dependency.",
+                0,
+                $e
             );
         }
     }
@@ -38,23 +45,13 @@ class ChannelEngineProxy implements ChannelEngineProxyInterface
             'Content-Type' => 'application/json'
         ]);
 
-        try {
-            $response = $this->httpClient->get($url);
+        $response = $this->httpClient->get($url);
+        $this->validateResponse($response);
 
-            if ($response['status_code'] !== 200) {
-                throw new Exception('Failed to get settings: HTTP ' . $response['status_code']);
-            }
+        $body = $response['body'];
+        $this->validateApiResponse($body);
 
-            $body = $response['body'];
-            if (!isset($body['Success']) || !$body['Success']) {
-                throw new Exception($body['Message'] ?? 'Unknown error');
-            }
-
-            return $body['Content'] ?? [];
-
-        } catch (Exception $e) {
-            throw new Exception('Failed to get ChannelEngine settings: ' . $e->getMessage());
-        }
+        return $body['Content'] ?? [];
     }
 
     /**
@@ -69,36 +66,100 @@ class ChannelEngineProxy implements ChannelEngineProxyInterface
             'Content-Type' => 'application/json'
         ]);
 
-        try {
-            $response = $this->httpClient->post($url, $products);
+        $response = $this->httpClient->post($url, $products);
+        $this->validateResponse($response, [200, 201]);
 
-            if ($response['status_code'] !== 201 && $response['status_code'] !== 200) {
-                throw new Exception('Failed to sync products: HTTP ' . $response['status_code']);
-            }
+        $body = $response['body'];
+        $this->validateApiResponse($body);
 
-            $body = $response['body'];
-            if (!isset($body['Success']) || !$body['Success']) {
-                $message = $body['Message'] ?? 'Unknown error';
+        return [
+            'success' => true,
+            'message' => $body['Message'] ?? 'Products synchronized successfully',
+            'content' => $body['Content'] ?? []
+        ];
+    }
 
-                if (isset($body['ValidationErrors']) && is_array($body['ValidationErrors'])) {
-                    $errors = [];
-                    foreach ($body['ValidationErrors'] as $error) {
-                        $errors[] = $error['Message'] ?? $error;
-                    }
-                    $message .= ' Validation errors: ' . implode(', ', $errors);
+    /**
+     * Validate HTTP response status code
+     *
+     * @param array $response
+     * @param array $expectedCodes
+     *
+     * @throws Exception
+     */
+    private function validateResponse(array $response, array $expectedCodes = [200]): void
+    {
+        $statusCode = $response['status_code'];
+
+        if (!in_array($statusCode, $expectedCodes)) {
+            $this->handleErrorResponse($response);
+        }
+    }
+
+    /**
+     * Validate ChannelEngine API response structure and success status
+     *
+     * @param mixed $body
+     *
+     * @throws Exception
+     */
+    private function validateApiResponse($body): void
+    {
+        if (!is_array($body)) {
+            throw new Exception('Invalid API response format');
+        }
+
+        if (!isset($body['Success']) || !$body['Success']) {
+            $message = $body['Message'] ?? 'Unknown API error';
+
+            if (isset($body['ValidationErrors']) && is_array($body['ValidationErrors'])) {
+                $errors = [];
+                foreach ($body['ValidationErrors'] as $error) {
+                    $errors[] = is_array($error) ? ($error['Message'] ?? $error) : $error;
                 }
-
-                throw new Exception($message);
+                $message .= ' Validation errors: ' . implode(', ', $errors);
             }
 
-            return [
-                'success' => true,
-                'message' => $body['Message'] ?? 'Products synchronized successfully',
-                'content' => $body['Content'] ?? []
-            ];
+            throw new Exception($message);
+        }
+    }
 
-        } catch (Exception $e) {
-            throw new Exception('Failed to sync products to ChannelEngine: ' . $e->getMessage());
+    /**
+     * Handle error responses based on HTTP status codes
+     *
+     * @param array $response
+     *
+     * @throws Exception
+     */
+    private function handleErrorResponse(array $response): void
+    {
+        $statusCode = $response['status_code'];
+        $body = $response['body'];
+
+        switch ($statusCode) {
+            case 401:
+                throw new Exception('HTTP 401: Invalid credentials or unauthorized access');
+            case 404:
+                throw new Exception('HTTP 404: Account not found or invalid endpoint');
+            case 400:
+                $message = 'HTTP 400: Bad request';
+                if (is_array($body) && isset($body['Message'])) {
+                    $message .= ' - ' . $body['Message'];
+                }
+                throw new Exception($message);
+            case 403:
+                throw new Exception('HTTP 403: Access forbidden');
+            case 500:
+                throw new Exception('HTTP 500: Internal server error');
+            default:
+                $message = "HTTP {$statusCode}: Request failed";
+                if (is_array($body) && isset($body['Message'])) {
+                    $message .= ' - ' . $body['Message'];
+                }
+                if (is_string($body)) {
+                    $message .= ' - ' . $body;
+                }
+                throw new Exception($message);
         }
     }
 }

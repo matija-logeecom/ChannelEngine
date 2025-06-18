@@ -11,11 +11,9 @@ use ChannelEngine\Business\Proxy\ChannelEngineProxy;
 use ChannelEngine\Business\Service\AuthorizationService;
 use ChannelEngine\Business\Service\ProductSyncService;
 use ChannelEngine\Data\Repository\ConfigurationRepository;
-use ChannelEngine\Data\Repository\ProductRepository;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use ChannelEngine\Infrastructure\HTTP\HttpClient;
-use ChannelEngine\Infrastructure\Response\HtmlResponse;
-use Exception;
+use PrestaShopLogger;
 
 /*
  * Responsible for initializing dependencies
@@ -25,8 +23,6 @@ class Bootstrap
 {
     /**
      * Initializes dependencies
-     *
-     * @throws Exception
      */
     public static function init(): void
     {
@@ -43,16 +39,14 @@ class Bootstrap
 
             ServiceRegistry::set(AuthorizationServiceInterface::class, new AuthorizationService());
 
-            ServiceRegistry::set(ProductRepositoryInterface::class, new ProductRepository());
-
             ServiceRegistry::set(ProductSyncServiceInterface::class, new ProductSyncService());
         } catch (\Throwable $e) {
-            error_log("CRITICAL BOOTSTRAP FAILURE in init(): " .
-                $e->getMessage() . "\n" . $e->getTraceAsString());
-            if (!headers_sent()) {
-                HtmlResponse::createInternalServerError(
-                    "A critical error occurred during application startup.")->view();
-            }
+            PrestaShopLogger::addLog(
+                'Critical error: Bootstrap failed! ' . $e->getMessage(),
+                4,
+                null,
+                'ChannelEngine'
+            );
 
             exit;
         }

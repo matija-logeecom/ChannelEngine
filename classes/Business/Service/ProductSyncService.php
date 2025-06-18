@@ -2,22 +2,27 @@
 
 namespace ChannelEngine\Business\Service;
 
+use ChannelEngine\Business\DTO\AccountData;
 use ChannelEngine\Business\DTO\Product;
 use ChannelEngine\Business\Interface\Proxy\ChannelEngineProxyInterface;
 use ChannelEngine\Business\Interface\Repository\ConfigurationRepositoryInterface;
-use ChannelEngine\Business\Interface\Repository\ProductRepositoryInterface;
 use ChannelEngine\Business\Interface\Service\ProductSyncServiceInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use Configuration;
+use Context;
 use Exception;
+use Image;
+use Manufacturer;
 use PrestaShopLogger;
+use Product as PrestaShopProduct;
 use RuntimeException;
+use StockAvailable;
+use Validate;
 
 class ProductSyncService implements ProductSyncServiceInterface
 {
     private ConfigurationRepositoryInterface $configRepository;
     private ChannelEngineProxyInterface $channelEngineProxy;
-    private ProductRepositoryInterface $productRepository;
 
     private const BATCH_SIZE = 100;
 
@@ -26,13 +31,11 @@ class ProductSyncService implements ProductSyncServiceInterface
         try {
             $this->configRepository = ServiceRegistry::get(ConfigurationRepositoryInterface::class);
             $this->channelEngineProxy = ServiceRegistry::get(ChannelEngineProxyInterface::class);
-            $this->productRepository = ServiceRegistry::get(ProductRepositoryInterface::class);
         } catch (Exception $e) {
-            error_log("CRITICAL: ProductSyncService could not be initialized. " .
-                "Failed to get a required service. Original error: " . $e->getMessage());
             throw new RuntimeException(
-                "ProductSyncService failed to initialize due to a " .
-                "missing critical dependency.", 0, $e
+                "ProductSyncService failed to initialize due to a missing critical dependency.",
+                0,
+                $e
             );
         }
     }
@@ -47,16 +50,11 @@ class ProductSyncService implements ProductSyncServiceInterface
         }
 
         try {
-            $credentials = $this->getCredentials();
+            $accountData = $this->getCredentials();
             $this->startSync();
 
-            $totalProducts = $this->productRepository->getActiveProductsCount();
-            if ($totalProducts === 0) {
-                return $this->handleNoProducts();
-            }
-
-            $syncResult = $this->syncProductBatches($credentials, $totalProducts);
-            return $this->finalizeSyncResult($syncResult, $totalProducts);
+            $syncResult = $this->syncProductBatches($accountData);
+            return $this->finalizeSyncResult($syncResult);
 
         } catch (Exception $e) {
             return $this->handleSyncError($e);
@@ -113,7 +111,6 @@ class ProductSyncService implements ProductSyncServiceInterface
             return true;
         } catch (Exception $e) {
             $this->logError('Failed to update sync status: ' . $e->getMessage());
-
             return false;
         }
     }
@@ -128,8 +125,8 @@ class ProductSyncService implements ProductSyncServiceInterface
         }
 
         try {
-            $credentials = $this->getCredentials();
-            $product = $this->productRepository->getProductById($productId);
+            $accountData = $this->getCredentials();
+            $product = $this->getProductById($productId);
 
             if (!$product) {
                 return $this->createErrorResponse(
@@ -142,8 +139,8 @@ class ProductSyncService implements ProductSyncServiceInterface
             $productData = [$productDto->toArray()];
 
             $result = $this->channelEngineProxy->syncProducts(
-                $credentials['account_name'],
-                $credentials['api_key'],
+                $accountData->getAccountName(),
+                $accountData->getApiKey(),
                 $productData
             );
 
@@ -171,21 +168,21 @@ class ProductSyncService implements ProductSyncServiceInterface
     /**
      * Get credentials from configuration
      *
-     * @return array
+     * @return AccountData
      *
      * @throws Exception
      */
-    private function getCredentials(): array
+    private function getCredentials(): AccountData
     {
-        $credentials = $this->configRepository->getCredentials();
-        if (!$credentials) {
-            throw new Exception('Failed to retrieve credentials');
+        $accountData = $this->configRepository->getAccountData();
+        if (!$accountData) {
+            throw new Exception('Failed to retrieve account data');
         }
-        return $credentials;
+        return $accountData;
     }
 
     /**
-     * Create new scratch file from selection
+     * Start sync process
      *
      * @return void
      */
@@ -196,6 +193,269 @@ class ProductSyncService implements ProductSyncServiceInterface
             'total_products' => 0,
             'synced_products' => 0
         ]);
+    }
+
+    /**
+     * Sync products in batches using PrestaShop's native methods
+     *
+     * @param AccountData $accountData
+     *
+     * @return array
+     */
+    private function syncProductBatches(AccountData $accountData): array
+    {
+        $syncedCount = 0;
+        $errors = [];
+        $offset = 0;
+        $totalProducts = 0;
+
+        while (true) {
+            $products = PrestaShopProduct::getProducts(
+                Context::getContext()->language->id,
+                $offset,
+                self::BATCH_SIZE,
+                'id_product',
+                'ASC',
+                false,
+                true,
+                Context::getContext()
+            );
+
+            if (empty($products)) {
+                break;
+            }
+
+            $batchResult = $this->syncBatch($accountData, $products);
+            $syncedCount += $batchResult['synced'];
+            $errors = array_merge($errors, $batchResult['errors']);
+            $totalProducts += count($products);
+
+            $offset += self::BATCH_SIZE;
+        }
+
+        return [
+            'synced_count' => $syncedCount,
+            'errors' => $errors,
+            'total_products' => $totalProducts
+        ];
+    }
+
+    /**
+     * Sync a single batch of products
+     *
+     * @param AccountData $accountData
+     * @param array $products
+     *
+     * @return array
+     */
+    private function syncBatch(AccountData $accountData, array $products): array
+    {
+        $synced = 0;
+        $errors = [];
+
+        try {
+            $productDtos = $this->convertProductsToDto($products, $errors);
+
+            if (!empty($productDtos)) {
+                $synced = $this->sendProductsToChannelEngine($accountData, $productDtos);
+            }
+        } catch (Exception $e) {
+            $errors[] = "Batch sync error: " . $e->getMessage();
+            $this->logError("Batch sync error: " . $e->getMessage());
+        }
+
+        return ['synced' => $synced, 'errors' => $errors];
+    }
+
+    /**
+     * Convert products to DTOs
+     *
+     * @param array $products
+     * @param array $errors
+     *
+     * @return array
+     */
+    private function convertProductsToDto(array $products, array &$errors): array
+    {
+        $productDtos = [];
+
+        foreach ($products as $productData) {
+            try {
+                $productId = (int)$productData['id_product'];
+                $product = $this->getProductById($productId);
+
+                if ($product) {
+                    $dto = Product::fromPrestashopProduct($product);
+                    $productDtos[] = $dto->toArray();
+                }
+            } catch (Exception $e) {
+                $errors[] = "Product ID {$productData['id_product']}: " . $e->getMessage();
+                $this->logError("Failed to convert product {$productData['id_product']}: " . $e->getMessage());
+            }
+        }
+
+        return $productDtos;
+    }
+
+    /**
+     * Get product by ID using PrestaShop's native methods
+     *
+     * @param int $productId
+     *
+     * @return array|null
+     */
+    private function getProductById(int $productId): ?array
+    {
+        $context = Context::getContext();
+        $product = new PrestaShopProduct($productId, false, $context->language->id, $context->shop->id);
+
+        if (!Validate::isLoadedObject($product) || !$product->active) {
+            return null;
+        }
+
+        $manufacturerName = '';
+        if ($product->id_manufacturer) {
+            $manufacturer = new Manufacturer($product->id_manufacturer, $context->language->id);
+            if (Validate::isLoadedObject($manufacturer)) {
+                $manufacturerName = $manufacturer->name;
+            }
+        }
+
+        $stockQuantity = StockAvailable::getQuantityAvailableByProduct($productId, null, $context->shop->id);
+
+        $imageUrl = $this->getProductImageUrl($productId, $product);
+
+        $specificPriceOutput =  null;
+        $price = PrestaShopProduct::getPriceStatic(
+            $productId,
+            true,
+            null,
+            6,
+            null,
+            false,
+            true,
+            1,
+            false,
+            null,
+            null,
+            null,
+            $specificPriceOutput,
+            true,
+            true,
+            $context
+        );
+
+        return [
+            'id_product' => $product->id,
+            'reference' => $product->reference,
+            'name' => $product->name,
+            'description' => $product->description,
+            'description_short' => $product->description_short,
+            'manufacturer_name' => $manufacturerName,
+            'price' => (float)$price,
+            'stock_quantity' => (int)$stockQuantity,
+            'image_url' => $imageUrl
+        ];
+    }
+
+    /**
+     * Get product image URL using PrestaShop's native Image class
+     *
+     * @param int $productId
+     * @param PrestaShopProduct $product
+     *
+     * @return string
+     */
+    private function getProductImageUrl(int $productId, PrestaShopProduct $product): string
+    {
+        try {
+            $context = Context::getContext();
+            $images = Image::getImages($context->language->id, $productId);
+
+            if (!empty($images)) {
+                $image = $images[0];
+                $imageId = (int) $image['id_image'];
+
+                $imageUrl = $context->link->getImageLink(
+                    $product->link_rewrite ?: 'product',
+                    $productId . '-' . $imageId,
+                    'large_default'
+                );
+
+                if (!empty($imageUrl) && !str_starts_with($imageUrl, 'http')) {
+                    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https://' : 'http://';
+                    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                    $imageUrl = $protocol . $host . '/' . ltrim($imageUrl, '/');
+                }
+
+                PrestaShopLogger::addLog(
+                    'ChannelEngine: Generated image URL for product ' . $productId . ': ' . $imageUrl,
+                    1,
+                    null,
+                    'ChannelEngine'
+                );
+
+                return $imageUrl;
+            }
+
+            return '';
+        } catch (\Exception $e) {
+            PrestaShopLogger::addLog(
+                'ChannelEngine: Failed to get product image URL for product ID ' . $productId . ': ' . $e->getMessage(),
+                3,
+                null,
+                'ChannelEngine'
+            );
+
+            return '';
+        }
+    }
+
+    /**
+     * Send products to ChannelEngine
+     *
+     * @param AccountData $accountData
+     * @param array $productDtos
+     * @return int
+     *
+     * @throws Exception
+     */
+    private function sendProductsToChannelEngine(AccountData $accountData, array $productDtos): int
+    {
+        $result = $this->channelEngineProxy->syncProducts(
+            $accountData->getAccountName(),
+            $accountData->getApiKey(),
+            $productDtos
+        );
+
+        return $result['success'] ? count($productDtos) : 0;
+    }
+
+    /**
+     * Finalize sync result based on outcome
+     *
+     * @param array $syncResult
+     *
+     * @return array
+     */
+    private function finalizeSyncResult(array $syncResult): array
+    {
+        $syncedCount = $syncResult['synced_count'];
+        $errors = $syncResult['errors'];
+        $totalProducts = $syncResult['total_products'];
+
+        if ($totalProducts === 0) {
+            return $this->handleNoProducts();
+        }
+
+        if ($syncedCount === 0 && !empty($errors)) {
+            return $this->handleCompleteFailure($errors, $totalProducts);
+        }
+        if ($syncedCount !== 0 && !empty($errors)) {
+            return $this->handlePartialSuccess($syncedCount, $totalProducts, $errors);
+        }
+
+        return $this->handleCompleteSuccess($syncedCount, $totalProducts);
     }
 
     /**
@@ -217,147 +477,6 @@ class ProductSyncService implements ProductSyncServiceInterface
             'total_products' => 0,
             'synced_products' => 0
         ];
-    }
-
-    /**
-     * Sync products in batches
-     *
-     * @param array $credentials
-     * @param int $totalProducts
-     *
-     * @return array
-     */
-    private function syncProductBatches(array $credentials, int $totalProducts): array
-    {
-        $syncedCount = 0;
-        $errors = [];
-
-        for ($offset = 0; $offset < $totalProducts; $offset += self::BATCH_SIZE) {
-            $batchResult = $this->syncBatch($credentials, $offset, $totalProducts);
-            $syncedCount += $batchResult['synced'];
-            $errors = array_merge($errors, $batchResult['errors']);
-        }
-
-        return ['synced_count' => $syncedCount, 'errors' => $errors];
-    }
-
-    /**
-     * Sync a single batch of products
-     *
-     * @param array $credentials
-     * @param int $offset
-     * @param int $totalProducts
-     *
-     * @return array
-     */
-    private function syncBatch(array $credentials, int $offset, int $totalProducts): array
-    {
-        $synced = 0;
-        $errors = [];
-
-        try {
-            $products = $this->productRepository->getAllActiveProducts(self::BATCH_SIZE, $offset);
-            if (empty($products)) {
-                return ['synced' => 0, 'errors' => []];
-            }
-
-            $productDtos = $this->convertProductsToDto($products, $errors);
-
-            if (!empty($productDtos)) {
-                $synced = $this->sendProductsToChannelEngine($credentials, $productDtos);
-                $this->updateProgress($totalProducts, $synced);
-            }
-        } catch (Exception $e) {
-            $errors[] = "Batch error at offset $offset: " . $e->getMessage();
-            $this->logError("Batch sync error at offset $offset: " . $e->getMessage());
-        }
-
-        return ['synced' => $synced, 'errors' => $errors];
-    }
-
-    /**
-     * Convert products to DTOs
-     *
-     * @param array $products
-     * @param array $errors
-     *
-     * @return array
-     */
-    private function convertProductsToDto(array $products, array &$errors): array
-    {
-        $productDtos = [];
-
-        foreach ($products as $product) {
-            try {
-                $dto = Product::fromPrestashopProduct($product);
-                $productDtos[] = $dto->toArray();
-            } catch (Exception $e) {
-                $errors[] = "Product ID {$product['id_product']}: " . $e->getMessage();
-                $this->logError("Failed to convert product {$product['id_product']}: " . $e->getMessage());
-            }
-        }
-
-        return $productDtos;
-    }
-
-
-    /**
-     * Send products to ChannelEngine
-     *
-     * @param array $credentials
-     * @param array $productDtos
-     *
-     * @return int
-     *
-     * @throws Exception
-     */
-    private function sendProductsToChannelEngine(array $credentials, array $productDtos): int
-    {
-        $result = $this->channelEngineProxy->syncProducts(
-            $credentials['account_name'],
-            $credentials['api_key'],
-            $productDtos
-        );
-
-        return $result['success'] ? count($productDtos) : 0;
-    }
-
-    /**
-     * Update sync progress
-     *
-     * @param int $totalProducts
-     * @param int $syncedProducts
-     *
-     * @return void
-     */
-    private function updateProgress(int $totalProducts, int $syncedProducts): void
-    {
-        $this->updateSyncStatus('in_progress', [
-            'total_products' => $totalProducts,
-            'synced_products' => $syncedProducts
-        ]);
-    }
-
-    /**
-     * Finalize sync result based on outcome
-     *
-     * @param array $syncResult
-     * @param int $totalProducts
-     *
-     * @return array
-     */
-    private function finalizeSyncResult(array $syncResult, int $totalProducts): array
-    {
-        $syncedCount = $syncResult['synced_count'];
-        $errors = $syncResult['errors'];
-
-        if ($syncedCount === 0 && !empty($errors)) {
-            return $this->handleCompleteFailure($errors, $totalProducts);
-        } elseif (!empty($errors)) {
-            return $this->handlePartialSuccess($syncedCount, $totalProducts, $errors);
-        } else {
-            return $this->handleCompleteSuccess($syncedCount, $totalProducts);
-        }
     }
 
     /**
@@ -506,8 +625,7 @@ class ProductSyncService implements ProductSyncServiceInterface
      */
     private function logError(string $message): void
     {
-        PrestaShopLogger::addLog('ChannelEngine: ' . $message, 3,
-            null, 'ChannelEngine');
+        PrestaShopLogger::addLog('ChannelEngine: ' . $message, 3, null, 'ChannelEngine');
     }
 
     /**
@@ -519,8 +637,7 @@ class ProductSyncService implements ProductSyncServiceInterface
      */
     private function logWarning(string $message): void
     {
-        PrestaShopLogger::addLog('ChannelEngine: ' . $message,
-            2, null, 'ChannelEngine');
+        PrestaShopLogger::addLog('ChannelEngine: ' . $message, 2, null, 'ChannelEngine');
     }
 
     /**
@@ -532,7 +649,6 @@ class ProductSyncService implements ProductSyncServiceInterface
      */
     private function logInfo(string $message): void
     {
-        PrestaShopLogger::addLog('ChannelEngine: ' . $message, 1,
-            null, 'ChannelEngine');
+        PrestaShopLogger::addLog('ChannelEngine: ' . $message, 1, null, 'ChannelEngine');
     }
 }

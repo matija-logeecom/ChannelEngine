@@ -2,6 +2,8 @@
 
 namespace ChannelEngine\Business\Interface\Service;
 
+use Exception;
+
 interface AuthorizationServiceInterface
 {
     /**
@@ -12,6 +14,8 @@ interface AuthorizationServiceInterface
      * @param string $apiKey
      *
      * @return array
+     *
+     * @throws Exception
      */
     public function authorizeConnection(string $accountName, string $apiKey): array;
 

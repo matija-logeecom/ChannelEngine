@@ -2,6 +2,7 @@
 
 namespace ChannelEngine\Data\Repository;
 
+use ChannelEngine\Business\DTO\AccountData;
 use ChannelEngine\Business\Interface\Repository\ConfigurationRepositoryInterface;
 use Configuration;
 
@@ -13,20 +14,21 @@ class ConfigurationRepository implements ConfigurationRepositoryInterface
     private const LAST_VALIDATED_KEY = 'CHANNELENGINE_LAST_VALIDATED';
     private const COMPANY_NAME_KEY = 'CHANNELENGINE_COMPANY_NAME';
     private const CURRENCY_CODE_KEY = 'CHANNELENGINE_CURRENCY_CODE';
-
+    private const SETTINGS_KEY = 'CHANNELENGINE_SETTINGS';
 
     /**
      * @inheritDoc
      */
-    public function saveCredentials(string $accountName, string $apiKey, array $accountData = []): bool
+    public function saveCredentials(AccountData $accountData): bool
     {
         $results = [
-            Configuration::updateValue(self::ACCOUNT_NAME_KEY, $accountName),
-            Configuration::updateValue(self::API_KEY_KEY, $apiKey),
+            Configuration::updateValue(self::ACCOUNT_NAME_KEY, $accountData->getAccountName()),
+            Configuration::updateValue(self::API_KEY_KEY, $accountData->getApiKey()),
             Configuration::updateValue(self::CONNECTION_STATUS_KEY, 'connected'),
             Configuration::updateValue(self::LAST_VALIDATED_KEY, time()),
-            Configuration::updateValue(self::COMPANY_NAME_KEY, $accountData['company_name'] ?? ''),
-            Configuration::updateValue(self::CURRENCY_CODE_KEY, $accountData['currency_code'] ?? ''),
+            Configuration::updateValue(self::COMPANY_NAME_KEY, $accountData->getCompanyName()),
+            Configuration::updateValue(self::CURRENCY_CODE_KEY, $accountData->getCurrencyCode()),
+            Configuration::updateValue(self::SETTINGS_KEY, json_encode($accountData->getSettings())),
         ];
 
         return !in_array(false, $results, true);
@@ -79,16 +81,24 @@ class ConfigurationRepository implements ConfigurationRepositoryInterface
     /**
      * @inheritDoc
      */
-    public function getAccountData(): array
+    public function getAccountData(): ?AccountData
     {
-        return [
-            'account_name' => Configuration::get(self::ACCOUNT_NAME_KEY) ?: null,
-            'company_name' => Configuration::get(self::COMPANY_NAME_KEY) ?: null,
-            'currency_code' => Configuration::get(self::CURRENCY_CODE_KEY) ?: null,
-            'status' => $this->getConnectionStatus(),
-            'last_validated' => $this->getLastValidatedTimestamp() ?
-                date('Y-m-d H:i:s', $this->getLastValidatedTimestamp()) : null
-        ];
+        $accountName = Configuration::get(self::ACCOUNT_NAME_KEY);
+
+        if (empty($accountName)) {
+            return null;
+        }
+
+        $settingsJson = Configuration::get(self::SETTINGS_KEY);
+        $settings = $settingsJson ? json_decode($settingsJson, true) : [];
+
+        return new AccountData(
+            $accountName,
+            Configuration::get(self::API_KEY_KEY) ?: '',
+            Configuration::get(self::COMPANY_NAME_KEY) ?: '',
+            Configuration::get(self::CURRENCY_CODE_KEY) ?: '',
+            is_array($settings) ? $settings : []
+        );
     }
 
     /**
@@ -102,7 +112,8 @@ class ConfigurationRepository implements ConfigurationRepositoryInterface
             Configuration::updateValue(self::CONNECTION_STATUS_KEY, 'disconnected'),
             Configuration::deleteByName(self::LAST_VALIDATED_KEY),
             Configuration::deleteByName(self::COMPANY_NAME_KEY),
-            Configuration::deleteByName(self::CURRENCY_CODE_KEY)
+            Configuration::deleteByName(self::CURRENCY_CODE_KEY),
+            Configuration::deleteByName(self::SETTINGS_KEY)
         ];
 
         return !in_array(false, $results, true);

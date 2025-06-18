@@ -2,18 +2,17 @@
 
 namespace ChannelEngine\Business\Interface\Repository;
 
+use ChannelEngine\Business\DTO\AccountData;
+
 interface ConfigurationRepositoryInterface
 {
     /**
      * Save authorization credentials and account data to configuration
      *
-     * @param string $accountName
-     * @param string $apiKey
-     * @param array $accountData
-     *
+     * @param AccountData $accountData
      * @return bool
      */
-    public function saveCredentials(string $accountName, string $apiKey, array $accountData = []): bool;
+    public function saveCredentials(AccountData $accountData): bool;
 
     /**
      * Get stored credentials
@@ -44,11 +43,11 @@ interface ConfigurationRepositoryInterface
     public function getLastValidatedTimestamp(): ?int;
 
     /**
-     * Get stored account data
+     * Get stored account data as DTO
      *
-     * @return array
+     * @return AccountData|null
      */
-    public function getAccountData(): array;
+    public function getAccountData(): ?AccountData;
 
     /**
      * Clear stored credentials and account data
@@ -61,7 +60,6 @@ interface ConfigurationRepositoryInterface
      * Update connection status only
      *
      * @param string $status
-     *
      * @return bool
      */
     public function updateConnectionStatus(string $status): bool;

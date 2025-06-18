@@ -2,11 +2,13 @@
 
 namespace ChannelEngine\Business\Service;
 
+use ChannelEngine\Business\DTO\AccountData;
 use ChannelEngine\Business\Interface\Proxy\ChannelEngineProxyInterface;
 use ChannelEngine\Business\Interface\Repository\ConfigurationRepositoryInterface;
 use ChannelEngine\Business\Interface\Service\AuthorizationServiceInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
 use Exception;
+use PrestaShopLogger;
 use RuntimeException;
 
 class AuthorizationService implements AuthorizationServiceInterface
@@ -20,11 +22,16 @@ class AuthorizationService implements AuthorizationServiceInterface
             $this->configRepository = ServiceRegistry::get(ConfigurationRepositoryInterface::class);
             $this->channelEngineProxy = ServiceRegistry::get(ChannelEngineProxyInterface::class);
         } catch (Exception $e) {
-            error_log("CRITICAL: AuthorizationService could not be initialized. " .
-                "Failed to get a required service. Original error: " . $e->getMessage());
+            PrestaShopLogger::addLog(
+                'ChannelEngine: AuthorizationService could not be initialized. Failed to get a required service. Original error: ' . $e->getMessage(),
+                3,
+                null,
+                'ChannelEngine'
+            );
             throw new RuntimeException(
-                "AuthorizationService failed to initialize due to a " .
-                "missing critical dependency.", 0, $e
+                "AuthorizationService failed to initialize due to a missing critical dependency.",
+                0,
+                $e
             );
         }
     }
@@ -42,53 +49,26 @@ class AuthorizationService implements AuthorizationServiceInterface
             ];
         }
 
-        try {
-            $settings = $this->channelEngineProxy->getSettings($accountName, $apiKey);
+        $settings = $this->channelEngineProxy->getSettings($accountName, $apiKey);
 
-            $accountData = [
-                'account_name' => $settings['Name'] ?? $accountName,
-                'company_name' => $settings['CompanyName'] ?? '',
-                'currency_code' => $settings['CurrencyCode'] ?? '',
-                'settings' => $settings
-            ];
+        $accountData = AccountData::fromChannelEngineSettings($settings, $accountName, $apiKey);
 
-            $saveResult = $this->configRepository->saveCredentials($accountName, $apiKey, $accountData);
-            if (!$saveResult) {
-                return [
-                    'success' => false,
-                    'message' => 'Failed to save configuration',
-                    'error_code' => 'SAVE_FAILED',
-                ];
-            }
-
-            return [
-                'success' => true,
-                'message' => 'Successfully connected to ChannelEngine',
-                'data' => $accountData,
-                'redirect' => true,
-                'redirect_url' => 'sync'
-            ];
-        } catch (Exception $e) {
-            $this->configRepository->updateConnectionStatus('failed');
-
-            $message = $e->getMessage();
-            $errorCode = 'API_ERROR';
-
-            if (str_contains($message, 'HTTP 401')) {
-                $message = 'Invalid account or API key. Please check your credentials.';
-                $errorCode = 'INVALID_CREDENTIALS';
-            }
-            if (str_contains($message, 'HTTP 404')) {
-                $message = 'Invalid account name. Please check your account name.';
-                $errorCode = 'INVALID_ACCOUNT';
-            }
-
+        $saveResult = $this->configRepository->saveCredentials($accountData);
+        if (!$saveResult) {
             return [
                 'success' => false,
-                'message' => $message,
-                'error_code' => $errorCode
+                'message' => 'Failed to save configuration',
+                'error_code' => 'SAVE_FAILED',
             ];
         }
+
+        return [
+            'success' => true,
+            'message' => 'Successfully connected to ChannelEngine',
+            'data' => $accountData->toPublicArray(),
+            'redirect' => true,
+            'redirect_url' => 'sync'
+        ];
     }
 
     /**
@@ -96,11 +76,26 @@ class AuthorizationService implements AuthorizationServiceInterface
      */
     public function getConnectionStatus(): array
     {
+        $accountData = $this->configRepository->getAccountData();
+
+        $data = [
+            'is_connected' => $this->isConnected()
+        ];
+
+        if ($accountData) {
+            $data = array_merge($data, [
+                'account_name' => $accountData->getAccountName(),
+                'company_name' => $accountData->getCompanyName(),
+                'currency_code' => $accountData->getCurrencyCode(),
+                'status' => $this->configRepository->getConnectionStatus(),
+                'last_validated' => $this->configRepository->getLastValidatedTimestamp() ?
+                    date('Y-m-d H:i:s', $this->configRepository->getLastValidatedTimestamp()) : null
+            ]);
+        }
+
         return [
             'success' => true,
-            'data' => array_merge($this->configRepository->getAccountData(), [
-                'is_connected' => $this->isConnected()
-            ])
+            'data' => $data
         ];
     }
 

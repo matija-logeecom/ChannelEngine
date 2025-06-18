@@ -9,13 +9,17 @@ class Product
     private string $description;
     private string $brand;
     private float $price;
+    private int $stock;
+    private string $imageUrl;
 
     public function __construct(
         string $merchantProductNo,
         string $name,
         string $description,
         string $brand,
-        float $price
+        float $price,
+        int $stock,
+        string $imageUrl
     )
     {
         $this->merchantProductNo = $merchantProductNo;
@@ -23,6 +27,8 @@ class Product
         $this->description = $description;
         $this->brand = $brand;
         $this->price = $price;
+        $this->stock = $stock;
+        $this->imageUrl = $imageUrl;
     }
 
     /**
@@ -37,7 +43,9 @@ class Product
             'Name' => $this->name,
             'Description' => $this->description,
             'Brand' => $this->brand,
-            'Price' => $this->price
+            'Price' => $this->price,
+            'Stock' => $this->stock,
+            'ImageUrl' => $this->imageUrl
         ];
     }
 
@@ -57,7 +65,9 @@ class Product
             $prestashopProduct['name'] ?? '',
             strip_tags($prestashopProduct['description'] ?? ''),
             $prestashopProduct['manufacturer_name'] ?? '',
-            (float)($prestashopProduct['price'] ?? 0)
+            (float)($prestashopProduct['price'] ?? 0),
+            (int)($prestashopProduct['stock_quantity'] ?? 0),
+            $prestashopProduct['image_url'] ?? ''
         );
     }
 
@@ -99,5 +109,21 @@ class Product
     public function getPrice(): float
     {
         return $this->price;
+    }
+
+    /**
+     * @return int
+     */
+    public function getStock(): int
+    {
+        return $this->stock;
+    }
+
+    /**
+     * @return string
+     */
+    public function getImageUrl(): string
+    {
+        return $this->imageUrl;
     }
 }

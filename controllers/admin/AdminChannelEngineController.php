@@ -1,5 +1,6 @@
 <?php
 
+use ChannelEngine\Business\Interface\Repository\ConfigurationRepositoryInterface;
 use ChannelEngine\Business\Interface\Service\AuthorizationServiceInterface;
 use ChannelEngine\Business\Interface\Service\ProductSyncServiceInterface;
 use ChannelEngine\Infrastructure\DI\ServiceRegistry;
@@ -10,6 +11,7 @@ class AdminChannelEngineController extends ModuleAdminController
 {
     private AuthorizationServiceInterface $authService;
     private ProductSyncServiceInterface $productSyncService;
+    private ConfigurationRepositoryInterface $configRepository;
 
     public function __construct()
     {
@@ -23,12 +25,18 @@ class AdminChannelEngineController extends ModuleAdminController
         try {
             $this->authService = ServiceRegistry::get(AuthorizationServiceInterface::class);
             $this->productSyncService = ServiceRegistry::get(ProductSyncServiceInterface::class);
+            $this->configRepository = ServiceRegistry::get(ConfigurationRepositoryInterface::class);
         } catch (Exception $e) {
-            error_log("CRITICAL: AdminChannelEngineController could not be initialized.
-             Failed to get required services. Original error: " . $e->getMessage());
+            PrestaShopLogger::addLog(
+                'ChannelEngine: AdminChannelEngineController could not be initialized. Failed to get required services. Original error: ' . $e->getMessage(),
+                3,
+                null,
+                'ChannelEngine'
+            );
             throw new RuntimeException(
-                "AdminChannelEngineController failed to initialize due to a
-                 missing critical dependency.", 0, $e
+                "AdminChannelEngineController failed to initialize due to a missing critical dependency.",
+                0,
+                $e
             );
         }
     }
@@ -90,6 +98,7 @@ class AdminChannelEngineController extends ModuleAdminController
                 'INTERNAL_ERROR'
             );
             $errorResponse->view();
+
             exit;
         }
     }
@@ -165,7 +174,7 @@ class AdminChannelEngineController extends ModuleAdminController
     }
 
     /**
-     * Handle connection request
+     * Handle connection request with proper exception handling for proxy errors
      *
      * @param array $requestData
      *
@@ -184,10 +193,36 @@ class AdminChannelEngineController extends ModuleAdminController
             );
         }
 
-        $result = $this->authService->authorizeConnection($accountName, $apiKey);
-        $statusCode = $result['success'] ? 200 : 400;
+        try {
+            $result = $this->authService->authorizeConnection($accountName, $apiKey);
+            $statusCode = $result['success'] ? 200 : 400;
 
-        return new JsonResponse($result, $statusCode);
+            return new JsonResponse($result, $statusCode);
+        } catch (Exception $e) {
+            $this->configRepository->updateConnectionStatus('failed');
+
+            $message = $e->getMessage();
+            $errorCode = 'API_ERROR';
+
+            if (str_contains($message, 'HTTP 401')) {
+                $message = 'Invalid account or API key. Please check your credentials.';
+                $errorCode = 'INVALID_CREDENTIALS';
+            }
+            if (str_contains($message, 'HTTP 404')) {
+                $message = 'Invalid account name. Please check your account name.';
+                $errorCode = 'INVALID_ACCOUNT';
+            }
+            if (str_contains($message, 'HTTP 403')) {
+                $message = 'Access forbidden. Please check your API permissions.';
+                $errorCode = 'ACCESS_FORBIDDEN';
+            }
+            if (str_contains($message, 'HTTP 5')) {
+                $message = 'ChannelEngine server error. Please try again later.';
+                $errorCode = 'SERVER_ERROR';
+            }
+
+            return $this->createErrorResponse($message, 400, $errorCode);
+        }
     }
 
     /**
